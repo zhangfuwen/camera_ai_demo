@@ -12,40 +12,30 @@ import os
 app = Flask(__name__, static_folder='.', template_folder='.')
 CORS(app)  # Enable CORS for all routes
 
-# Load YOLO segmentation model
-print("Loading YOLO segmentation model...")
+# Load the trained food detection model
+# First try to load the trained model from the training directory
+#model_path = "food_detection_training/runs/detect/food_det_model/weights/best.pt"
+model_path = "yolov8n-seg.pt"
+fallback_model_path = "yolov8n.pt"
+
+print("Loading food detection model...")
 try:
-    model = YOLO('yolov8n-seg.pt')  # You can change this to yolov8s-seg.pt, yolov8m-seg.pt, etc. for different sizes
+    model = YOLO(model_path)
+    print(f"Loaded trained model from {model_path}")
+except Exception as e:
+    print(f"Could not load trained model: {e}")
+    print(f"Loading default YOLOv8 model instead...")
+    model = YOLO(fallback_model_path)
+
+# Get the model's class names
+try:
+    class_names = model.names  # This gets the class names from the trained model
+    print(f"Model loaded with {len(class_names)} classes: {list(class_names.values())}")
 except:
-    # If the model isn't downloaded, try to download it first
-    print("Downloading YOLO segmentation model...")
-    model = YOLO('yolov8n-seg.pt')
+    class_names = {}  # Fallback if class names aren't available
+    print("Could not retrieve class names from model")
 
-# COCO dataset class names (index corresponds to class id)
-COCO_CLASSES = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-    'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-    'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
-    'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-    'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-    'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
-    'hair drier', 'toothbrush'
-]
 
-# Food-related categories (indices correspond to COCO dataset class ids)
-FOOD_CATEGORIES = {
-    44: 'bottle', 46: 'wine glass', 47: 'cup', 48: 'fork', 
-    49: 'knife', 50: 'spoon', 51: 'bowl', 52: 'banana', 
-    53: 'apple', 54: 'sandwich', 55: 'orange', 56: 'broccoli',
-    57: 'carrot', 58: 'hot dog', 59: 'pizza', 60: 'donut', 61: 'cake',
-    62: 'chair', 63: 'couch', 64: 'potted plant', 65: 'bed', 67: 'dining table',
-    72: 'tv', 73: 'laptop', 74: 'mouse', 75: 'remote', 76: 'keyboard',
-    77: 'cell phone', 78: 'microwave', 79: 'oven', 80: 'toaster',
-    81: 'sink', 82: 'refrigerator', 84: 'book', 85: 'clock',
-    86: 'vase', 87: 'scissors', 88: 'teddy bear', 89: 'hair drier', 90: 'toothbrush'
-}
 
 @app.route('/')
 def home():
@@ -60,147 +50,211 @@ def serve_static(path):
 @app.route('/detect_food', methods=['POST'])
 def detect_food():
     """
-    Detect food items in an image sent via POST request using YOLO segmentation
-    Expected format: JSON with 'image' field containing base64 encoded image
+    Handle POST requests with base64 encoded images for YOLO segmentation-based food detection.
+    
+    Expected JSON format:
+    {
+        "image": "base64_encoded_image_string"
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "detections": [
+            {
+                "label": "food_item_name",
+                "score": confidence_score,
+                "box": {"xmin": x1, "ymin": y1, "xmax": x2, "ymax": y2},
+                "mask": [[0, 0, 1, 1, ...], ...]  // 2D array representing the segmentation mask
+            }
+        ]
+    }
     """
-    # print("detect_food")
-    # app.logger.info("detect_food")
     try:
-        print("request", request)
-        data = request.json
-        image_data = data.get('image')
-        
-        if not image_data:
-            print("No image provided")
-            return jsonify({'error': 'No image provided'}), 400
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "No image data provided"}), 400
         
         # Decode base64 image
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
+        image_data = base64.b64decode(data['image'])
+        nparr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # Convert PIL image to numpy array for YOLO
-        img_array = np.array(image)
+        if img is None:
+            return jsonify({"success": False, "error": "Could not decode image"}), 400
         
         # Perform segmentation with YOLO
-        results = model(img_array)
-        # print("results", results)
+        results = model(img, conf=0.1)  # Confidence threshold of 0.5
         
-        # Process results
-        food_results = []
-        for r in results:
-            boxes = r.boxes  # Boxes object for bbox outputs
-            masks = r.masks  # Masks object for segmentation masks
-            print("boxes", len(boxes))
-            print("masks", len(masks))
-
-            if boxes is not None:
-                for i, box in enumerate(boxes):
-                    cls = int(box.cls[0])  # Class id
-                    conf = float(box.conf[0])  # Confidence score
-
-                    # Check if this category is food-related
-                    if cls in FOOD_CATEGORIES:
-                        # Get bounding box coordinates
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-
-                        # Create result entry
-                        result_entry = {
-                            'label': FOOD_CATEGORIES[cls],
-                            'score': conf,
-                            'box': {
-                                'xmin': float(x1),
-                                'ymin': float(y1),
-                                'xmax': float(x2),
-                                'ymax': float(y2)
-                            }
-                        }
-
-                        # Add mask if available
-                        if masks is not None and i < len(masks):
-                            mask = masks[i].data.cpu().numpy()[0]  # Extract mask data
-                            result_entry['mask'] = mask.tolist()  # Convert to list for JSON serialization
-
-                        food_results.append(result_entry)
-
+        detections = []
+        
+        # Process detections
+        if results and len(results) > 0:
+            r = results[0]
+            
+            # Get boxes, scores, and class IDs
+            boxes = r.boxes.xyxy.cpu().numpy()  # Bounding boxes
+            scores = r.boxes.conf.cpu().numpy()  # Confidence scores
+            class_ids = r.boxes.cls.cpu().numpy()  # Class IDs
+            
+            # Get masks if available
+            masks = r.masks.data.cpu().numpy() if r.masks is not None else None
+            
+            for i in range(len(boxes)):
+                box = boxes[i]
+                score = float(scores[i])
+                class_id = int(class_ids[i])
+                
+                # Convert class ID to label - all models have their class names embedded
+                label = model.names.get(class_id, f"Class {class_id}")
+                
+                # Include all detections regardless of class
+                # Prepare detection data
+                detection = {
+                    "label": label,
+                    "score": score,
+                    "box": {
+                        "xmin": float(box[0]),
+                        "ymin": float(box[1]),
+                        "xmax": float(box[2]),
+                        "ymax": float(box[3])
+                    }
+                }
+                
+                # Add mask data if available
+                if masks is not None and i < len(masks):
+                    # Convert mask tensor to a 2D array of 0s and 1s
+                    mask_tensor = masks[i]
+                    # Convert to binary mask and then to list format
+                    mask_array = (mask_tensor > 0.5).astype(int).tolist()
+                    detection["mask"] = mask_array
+                
+                detections.append(detection)
+        
         return jsonify({
-            'success': True,
-            'detections': food_results,
-            'total_food_items': len(food_results)
+            "success": True,
+            "detections": detections
         })
-
+    
     except Exception as e:
-        print("Exception", e)
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Error in detect_food: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/detect_food_stream', methods=['POST'])
 def detect_food_stream():
     """
-    Detect food items in video stream frames using YOLO segmentation
-    Expects multipart/form-data with 'frame' containing image file
+    Handle POST requests with base64 encoded images for YOLO segmentation-based food detection.
+    Same functionality as /detect_food but with a different endpoint name.
+    
+    Expected JSON format:
+    {
+        "image": "base64_encoded_image_string"
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "detections": [
+            {
+                "label": "food_item_name",
+                "score": confidence_score,
+                "box": {"xmin": x1, "ymin": y1, "xmax": x2, "ymax": y2},
+                "mask": [[0, 0, 1, 1, ...], ...]  // 2D array representing the segmentation mask
+            }
+        ]
+    }
     """
     try:
-        print("request", request)
-        if 'frame' not in request.files:
-            return jsonify({'error': 'No frame provided'}), 400
-
-        file = request.files['frame']
-        image = Image.open(file.stream)
-
-        # Convert PIL image to numpy array for YOLO
-        img_array = np.array(image)
-
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "No image data provided"}), 400
+        
+        # Decode base64 image
+        image_data = base64.b64decode(data['image'])
+        nparr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({"success": False, "error": "Could not decode image"}), 400
+        
         # Perform segmentation with YOLO
-        results = model(img_array)
-
-        # Process results
-        food_results = []
-        for r in results:
-            boxes = r.boxes  # Boxes object for bbox outputs
-            masks = r.masks  # Masks object for segmentation masks
-
-            if boxes is not None:
-                for i, box in enumerate(boxes):
-                    cls = int(box.cls[0])  # Class id
-                    conf = float(box.conf[0])  # Confidence score
-
-                    # Check if this category is food-related
-                    if cls in FOOD_CATEGORIES:
-                        # Get bounding box coordinates
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-
-                        # Create result entry
-                        result_entry = {
-                            'label': FOOD_CATEGORIES[cls],
-                            'score': conf,
-                            'box': {
-                                'xmin': float(x1),
-                                'ymin': float(y1),
-                                'xmax': float(x2),
-                                'ymax': float(y2)
-                            }
-                        }
-
-                        # Add mask if available
-                        if masks is not None and i < len(masks):
-                            mask = masks[i].data.cpu().numpy()[0]  # Extract mask data
-                            result_entry['mask'] = mask.tolist()  # Convert to list for JSON serialization
-
-                        food_results.append(result_entry)
-
+        results = model(img, conf=0.5)  # Confidence threshold of 0.5
+        
+        detections = []
+        
+        # Process detections
+        if results and len(results) > 0:
+            r = results[0]
+            
+            # Get boxes, scores, and class IDs
+            boxes = r.boxes.xyxy.cpu().numpy()  # Bounding boxes
+            scores = r.boxes.conf.cpu().numpy()  # Confidence scores
+            class_ids = r.boxes.cls.cpu().numpy()  # Class IDs
+            
+            # Get masks if available
+            masks = r.masks.data.cpu().numpy() if r.masks is not None else None
+            
+            for i in range(len(boxes)):
+                box = boxes[i]
+                score = float(scores[i])
+                class_id = int(class_ids[i])
+                
+                # Convert class ID to label - all models have their class names embedded
+                label = model.names.get(class_id, f"Class {class_id}")
+                
+                # Include all detections regardless of class
+                # Prepare detection data
+                detection = {
+                    "label": label,
+                    "score": score,
+                    "box": {
+                        "xmin": float(box[0]),
+                        "ymin": float(box[1]),
+                        "xmax": float(box[2]),
+                        "ymax": float(box[3])
+                    }
+                }
+                
+                # Add mask data if available
+                if masks is not None and i < len(masks):
+                    # Convert mask tensor to a 2D array of 0s and 1s
+                    mask_tensor = masks[i]
+                    # Convert to binary mask and then to list format
+                    mask_array = (mask_tensor > 0.5).astype(int).tolist()
+                    detection["mask"] = mask_array
+                
+                detections.append(detection)
+        
         return jsonify({
-            'success': True,
-            'detections': food_results,
-            'total_food_items': len(food_results)
+            "success": True,
+            "detections": detections
         })
-
+    
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Error in detect_food_stream: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'model_loaded': True})
 
+
+@app.route('/classes', methods=['GET'])
+def get_classes():
+    """Return the list of available food classes"""
+    try:
+        class_names = list(model.names.values()) if hasattr(model, 'names') else []
+        return jsonify({
+            'success': True,
+            'classes': class_names,
+            'count': len(class_names)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     print("Starting YOLO food detection server...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

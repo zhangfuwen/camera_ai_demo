@@ -155,7 +155,7 @@
             background-color: #333;
             transform: scaleX(-1);
             -webkit-transform: scaleX(-1); /* For older Safari versions */
-            -moz-transform: scaleX(-1);    /* For older Firefox versions */
+            -moz-transform: scaleX(-1); /* For older Firefox versions */
         }
 
         #detection-overlay {
@@ -206,7 +206,7 @@
         .hidden {
             display: none;
         }
-        
+
         .permission-prompt {
             text-align: center;
             padding: 20px;
@@ -215,7 +215,7 @@
             border-radius: 4px;
             margin-bottom: 15px;
         }
-        
+
         .detection-info {
             position: absolute;
             top: 50px;
@@ -230,545 +230,384 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Control Panel -->
-        <div class="control-panel" id="control-panel">
-            <div class="permission-prompt" id="permission-prompt">
-                <p>Please grant camera permission to detect available cameras</p>
-                <button id="request-permission-btn" class="request-permission-btn">Request Camera Permission</button>
-            </div>
-            
-            <div class="panel-section">
-                <h2 class="panel-title">Main Camera</h2>
-                <div class="camera-selector">
-                    <label for="main-camera-select">Select Main Camera:</label>
-                    <select id="main-camera-select" disabled>
-                        <option value="">-- Select a camera --</option>
-                    </select>
-                </div>
-                <button id="start-main-btn" disabled>Start Main Camera</button>
-                <button id="stop-main-btn" class="btn-stop" disabled>Stop Main Camera</button>
-            </div>
-
-            <div class="panel-section">
-                <h2 class="panel-title">PIP Camera</h2>
-                <div class="camera-selector">
-                    <label for="pip-camera-select">Select PIP Camera:</label>
-                    <select id="pip-camera-select" disabled>
-                        <option value="">-- Select a camera --</option>
-                    </select>
-                </div>
-                <button id="start-pip-btn" disabled>Start PIP Camera</button>
-                <button id="stop-pip-btn" class="btn-stop" disabled>Stop PIP Camera</button>
-            </div>
-
-            <div class="panel-section">
-                <h2 class="panel-title">Food Detection</h2>
-                <button id="food-detection-btn" class="food-detection-btn" disabled>Start Food Detection</button>
-                <div id="detection-status" class="status-indicator">Food Detection: Off</div>
-            </div>
-
-            <div class="panel-section">
-                <h2 class="panel-title">Controls</h2>
-                <button id="toggle-pip-btn" disabled>Toggle PIP Visibility</button>
-                <button id="swap-cameras-btn" disabled>Swap Cameras</button>
-            </div>
-
-            <div class="panel-section">
-                <h2 class="panel-title">Status</h2>
-                <div id="main-status" class="status-indicator">Main Camera: Not Active</div>
-                <div id="pip-status" class="status-indicator">PIP Camera: Not Active</div>
-            </div>
+<div class="container">
+    <!-- Control Panel -->
+    <div class="control-panel" id="control-panel">
+        <div class="permission-prompt" id="permission-prompt">
+            <p>Please grant camera permission to detect available cameras</p>
+            <button id="request-permission-btn" class="request-permission-btn">Request Camera Permission</button>
         </div>
 
-        <!-- Camera View -->
-        <div class="camera-view" id="camera-view">
-            <button id="toggle-control-panel-btn" class="toggle-control-panel-btn">← Hide Panel</button>
-            <div id="detection-info" class="detection-info" style="display: none;">Food Items Detected: <span id="food-count">0</span></div>
-            <div class="main-camera-container">
-                <video id="main-video" autoplay muted playsinline></video>
-                <canvas id="detection-overlay"></canvas>
+        <div class="panel-section">
+            <h2 class="panel-title">Main Camera</h2>
+            <div class="camera-selector">
+                <label for="main-camera-select">Select Main Camera:</label>
+                <select id="main-camera-select" disabled>
+                    <option value="">-- Select a camera --</option>
+                </select>
             </div>
-            <div class="pip-container">
-                <div class="pip-controls">
-                    <button id="pip-up">↑</button>
-                    <button id="pip-down">↓</button>
-                    <button id="pip-left">←</button>
-                    <button id="pip-right">→</button>
-                </div>
-                <video id="pip-video" autoplay muted playsinline></video>
+            <button id="start-main-btn" disabled>Start Main Camera</button>
+            <button id="stop-main-btn" class="btn-stop" disabled>Stop Main Camera</button>
+        </div>
+
+        <div class="panel-section">
+            <h2 class="panel-title">PIP Camera</h2>
+            <div class="camera-selector">
+                <label for="pip-camera-select">Select PIP Camera:</label>
+                <select id="pip-camera-select" disabled>
+                    <option value="">-- Select a camera --</option>
+                </select>
             </div>
+            <button id="start-pip-btn" disabled>Start PIP Camera</button>
+            <button id="stop-pip-btn" class="btn-stop" disabled>Stop PIP Camera</button>
+        </div>
+
+        <div class="panel-section">
+            <h2 class="panel-title">Food Detection</h2>
+            <button id="food-detection-btn" class="food-detection-btn" disabled>Start Food Detection</button>
+            <div id="detection-status" class="status-indicator">Food Detection: Off</div>
+        </div>
+
+        <div class="panel-section">
+            <h2 class="panel-title">Controls</h2>
+            <button id="toggle-pip-btn" disabled>Toggle PIP Visibility</button>
+            <button id="swap-cameras-btn" disabled>Swap Cameras</button>
+        </div>
+
+        <div class="panel-section">
+            <h2 class="panel-title">Status</h2>
+            <div id="main-status" class="status-indicator">Main Camera: Not Active</div>
+            <div id="pip-status" class="status-indicator">PIP Camera: Not Active</div>
         </div>
     </div>
 
-    <script>
-        // Import the food detection class
-        class FoodDetectionCamera {
-            constructor(apiEndpoint = 'http://localhost:5000') {
-                this.apiEndpoint = apiEndpoint;
-                this.isDetecting = false;
-                this.detectionInterval = null;
-                this.canvas = document.createElement('canvas');
-                this.ctx = this.canvas.getContext('2d');
-                this.overlayCanvas = document.getElementById('detection-overlay');
-                this.overlayCtx = this.overlayCanvas.getContext('2d');
-                this.foodCountElement = document.getElementById('food-count');
-                this.detectionInfoElement = document.getElementById('detection-info');
-            }
+    <!-- Camera View -->
+    <div class="camera-view" id="camera-view">
+        <button id="toggle-control-panel-btn" class="toggle-control-panel-btn">← Hide Panel</button>
+        <div id="detection-info" class="detection-info" style="display: none;">Food Items Detected: <span
+                id="food-count">0</span></div>
+        <div class="main-camera-container">
+            <video id="main-video" autoplay muted playsinline></video>
+            <canvas id="detection-overlay"></canvas>
+        </div>
+        <div class="pip-container">
+            <div class="pip-controls">
+                <button id="pip-up">↑</button>
+                <button id="pip-down">↓</button>
+                <button id="pip-left">←</button>
+                <button id="pip-right">→</button>
+            </div>
+            <video id="pip-video" autoplay muted playsinline></video>
+        </div>
+    </div>
+</div>
 
-            async detectFoodInFrame(videoElement) {
-                // Resize the canvas to match video dimensions
-                if (this.overlayCanvas.width !== videoElement.videoWidth || 
-                    this.overlayCanvas.height !== videoElement.videoHeight) {
-                    this.overlayCanvas.width = videoElement.videoWidth;
-                    this.overlayCanvas.height = videoElement.videoHeight;
-                    
-                    // Also resize the overlay to match the display size
-                    this.overlayCanvas.style.width = videoElement.offsetWidth + 'px';
-                    this.overlayCanvas.style.height = videoElement.offsetHeight + 'px';
-                }
+<!-- Include the external camera detection script -->
+<script src="camera_food_detection.js"></script>
 
-                // Draw current video frame to canvas
-                this.canvas.width = videoElement.videoWidth;
-                this.canvas.height = videoElement.videoHeight;
-                this.ctx.drawImage(videoElement, 0, 0, this.canvas.width, this.canvas.height);
+<script>
+    // Global variables to store video streams
+    let mainStream = null;
+    let pipStream = null;
+    let availableCameras = [];
+    let controlPanelVisible = true;
+    let foodDetector = null;
 
-                // Convert canvas to base64 image
-                const imageData = this.canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    // DOM Elements
+    const mainVideo = document.getElementById('main-video');
+    const pipVideo = document.getElementById('pip-video');
+    const mainCameraSelect = document.getElementById('main-camera-select');
+    const pipCameraSelect = document.getElementById('pip-camera-select');
+    const startMainBtn = document.getElementById('start-main-btn');
+    const stopMainBtn = document.getElementById('stop-main-btn');
+    const startPipBtn = document.getElementById('start-pip-btn');
+    const stopPipBtn = document.getElementById('stop-pip-btn');
+    const togglePipBtn = document.getElementById('toggle-pip-btn');
+    const swapCamerasBtn = document.getElementById('swap-cameras-btn');
+    const mainStatus = document.getElementById('main-status');
+    const pipStatus = document.getElementById('pip-status');
+    const permissionPrompt = document.getElementById('permission-prompt');
+    const requestPermissionBtn = document.getElementById('request-permission-btn');
+    const controlPanel = document.getElementById('control-panel');
+    const cameraView = document.getElementById('camera-view');
+    const toggleControlPanelBtn = document.getElementById('toggle-control-panel-btn');
+    const foodDetectionBtn = document.getElementById('food-detection-btn');
+    const detectionStatus = document.getElementById('detection-status');
 
-                try {
-                    // Send to backend for food detection
-                    const response = await fetch(`${this.apiEndpoint}/detect_food`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ image: imageData })
-                    });
+    // Initialize the application
+    async function init() {
+        setupEventListeners();
 
-                    const result = await response.json();
+        // Initialize food detector
+        foodDetector = new FoodDetectionCamera('main-video', 'detection-overlay');
 
-                    if (result.success) {
-                        this.drawDetections(result.detections);
-                        
-                        // Update food count display
-                        this.foodCountElement.textContent = result.total_food_items;
-                        if (result.total_food_items > 0) {
-                            this.detectionInfoElement.style.display = 'block';
-                        } else {
-                            this.detectionInfoElement.style.display = 'none';
-                        }
-                        
-                        return result;
-                    } else {
-                        console.error('Detection failed:', result.error);
-                        return null;
-                    }
-                } catch (error) {
-                    console.error('Error during food detection:', error);
-                    return null;
-                }
-            }
+        // Test connection to backend
+        const isConnected = await foodDetector.testConnection();
+        if (isConnected) {
+            console.log('Successfully connected to food detection API');
+        } else {
+            console.warn('Could not connect to food detection API. Please start the Python server.');
+        }
+    }
 
-            drawDetections(detections) {
-                // Clear previous drawings
-                this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    // Set up event listeners
+    function setupEventListeners() {
+        requestPermissionBtn.addEventListener('click', requestInitialPermission);
+        startMainBtn.addEventListener('click', () => startCamera('main'));
+        stopMainBtn.addEventListener('click', () => stopCamera('main'));
+        startPipBtn.addEventListener('click', () => startCamera('pip'));
+        stopPipBtn.addEventListener('click', () => stopCamera('pip'));
+        togglePipBtn.addEventListener('click', togglePipVisibility);
+        swapCamerasBtn.addEventListener('click', swapCameras);
+        toggleControlPanelBtn.addEventListener('click', toggleControlPanel);
+        foodDetectionBtn.addEventListener('click', toggleFoodDetection);
 
-                detections.forEach(detection => {
-                    const box = detection.box;
-                    const confidence = Math.round(detection.score * 100);
+        // PIP positioning controls
+        document.getElementById('pip-up').addEventListener('click', () => movePip('up'));
+        document.getElementById('pip-down').addEventListener('click', () => movePip('down'));
+        document.getElementById('pip-left').addEventListener('click', () => movePip('left'));
+        document.getElementById('pip-right').addEventListener('click', () => movePip('right'));
+    }
 
-                    // Scale coordinates to match display size
-                    const scaleX = this.overlayCanvas.width / this.canvas.width;
-                    const scaleY = this.overlayCanvas.height / this.canvas.height;
-                    
-                    const scaledBox = {
-                        xmin: box.xmin * scaleX,
-                        ymin: box.ymin * scaleY,
-                        xmax: box.xmax * scaleX,
-                        ymax: box.ymax * scaleY
-                    };
-
-                    // Draw bounding box
-                    this.overlayCtx.strokeStyle = '#FF0000';
-                    this.overlayCtx.lineWidth = 2;
-                    this.overlayCtx.strokeRect(
-                        scaledBox.xmin,
-                        scaledBox.ymin,
-                        scaledBox.xmax - scaledBox.xmin,
-                        scaledBox.ymax - scaledBox.ymin
-                    );
-
-                    // Draw label background
-                    this.overlayCtx.fillStyle = 'rgba(255, 0, 0, 0.7)';
-                    this.overlayCtx.fillRect(
-                        scaledBox.xmin,
-                        scaledBox.ymin - 20,
-                        detection.label.length * 10 + 30,
-                        20
-                    );
-
-                    // Draw label text
-                    this.overlayCtx.fillStyle = 'white';
-                    this.overlayCtx.font = '14px Arial';
-                    this.overlayCtx.fillText(
-                        `${detection.label} (${confidence}%)`,
-                        scaledBox.xmin + 5,
-                        scaledBox.ymin - 5
-                    );
-                });
-            }
-
-            startDetection(videoElement, intervalMs = 1000) {
-                if (this.isDetecting) {
-                    console.log('Detection already running');
-                    return;
-                }
-
-                this.isDetecting = true;
-                console.log('Starting food detection...');
-
-                const detect = async () => {
-                    if (this.isDetecting && videoElement && !videoElement.paused && !videoElement.ended) {
-                        await this.detectFoodInFrame(videoElement);
-                    }
-                };
-
-                // Run detection immediately and then at intervals
-                detect();
-                this.detectionInterval = setInterval(detect, intervalMs);
-            }
-
-            stopDetection() {
-                this.isDetecting = false;
-                if (this.detectionInterval) {
-                    clearInterval(this.detectionInterval);
-                    this.detectionInterval = null;
-                }
-                
-                // Clear the overlay
-                if (this.overlayCtx) {
-                    this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-                }
-                
-                // Hide food count display
-                this.detectionInfoElement.style.display = 'none';
-                
-                console.log('Stopped food detection');
-            }
-
-            async testConnection() {
-                try {
-                    const response = await fetch(`${this.apiEndpoint}/health`);
-                    const health = await response.json();
-                    return health.status === 'healthy';
-                } catch (error) {
-                    console.error('Cannot connect to food detection API:', error);
-                    return false;
-                }
-            }
+    // Toggle food detection
+    function toggleFoodDetection() {
+        if (!mainVideo.srcObject) {
+            alert('Please start the main camera first');
+            return;
         }
 
-        // Global variables to store video streams
-        let mainStream = null;
-        let pipStream = null;
-        let availableCameras = [];
-        let controlPanelVisible = true;
-        let foodDetector = null;
+        if (foodDetector.isDetecting) {
+            foodDetector.stopDetection();
+            foodDetectionBtn.classList.remove('active');
+            foodDetectionBtn.innerHTML="Start Food Detection";
+            detectionStatus.textContent = 'Food Detection: Off';
+        } else {
+            foodDetector.startDetection(mainVideo, 1500); // Detect every 1.5 seconds
+            foodDetectionBtn.classList.add('active');
+            foodDetectionBtn.innerHTML="Stop Food Detection";
+            detectionStatus.textContent = 'Food Detection: Active';
+        }
+    }
 
-        // DOM Elements
-        const mainVideo = document.getElementById('main-video');
-        const pipVideo = document.getElementById('pip-video');
-        const mainCameraSelect = document.getElementById('main-camera-select');
-        const pipCameraSelect = document.getElementById('pip-camera-select');
-        const startMainBtn = document.getElementById('start-main-btn');
-        const stopMainBtn = document.getElementById('stop-main-btn');
-        const startPipBtn = document.getElementById('start-pip-btn');
-        const stopPipBtn = document.getElementById('stop-pip-btn');
-        const togglePipBtn = document.getElementById('toggle-pip-btn');
-        const swapCamerasBtn = document.getElementById('swap-cameras-btn');
-        const mainStatus = document.getElementById('main-status');
-        const pipStatus = document.getElementById('pip-status');
-        const permissionPrompt = document.getElementById('permission-prompt');
-        const requestPermissionBtn = document.getElementById('request-permission-btn');
-        const controlPanel = document.getElementById('control-panel');
-        const cameraView = document.getElementById('camera-view');
-        const toggleControlPanelBtn = document.getElementById('toggle-control-panel-btn');
-        const foodDetectionBtn = document.getElementById('food-detection-btn');
-        const detectionStatus = document.getElementById('detection-status');
+    // Toggle control panel visibility
+    function toggleControlPanel() {
+        controlPanelVisible = !controlPanelVisible;
 
-        // Initialize the application
-        async function init() {
-            setupEventListeners();
-            
-            // Initialize food detector
-            foodDetector = new FoodDetectionCamera();
-            
-            // Test connection to backend
-            const isConnected = await foodDetector.testConnection();
-            if (isConnected) {
-                console.log('Successfully connected to food detection API');
+        if (controlPanelVisible) {
+            controlPanel.classList.remove('hidden');
+            cameraView.classList.remove('full-width');
+            toggleControlPanelBtn.textContent = '← Hide Panel';
+        } else {
+            controlPanel.classList.add('hidden');
+            cameraView.classList.add('full-width');
+            toggleControlPanelBtn.textContent = 'Show Panel →';
+        }
+    }
+
+    // Request initial camera permission to enable device enumeration
+    async function requestInitialPermission() {
+        try {
+            // First, request temporary camera access to allow device enumeration
+            const tempStream = await navigator.mediaDevices.getUserMedia({video: true});
+
+            // Stop the temporary stream since we just needed to trigger permission
+            tempStream.getTracks().forEach(track => track.stop());
+
+            // Now we can enumerate devices
+            await getAvailableCameras();
+
+            // Update UI to enable controls
+            updateUIAfterPermission();
+        } catch (error) {
+            console.error('Error requesting camera permission:', error);
+            alert('Could not access cameras. Please ensure camera permissions are granted.');
+        }
+    }
+
+    // Get available cameras
+    async function getAvailableCameras() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            availableCameras = devices.filter(device => device.kind === 'videoinput');
+
+            // Clear existing options
+            mainCameraSelect.innerHTML = '<option value="">-- Select a camera --</option>';
+            pipCameraSelect.innerHTML = '<option value="">-- Select a camera --</option>';
+
+            // Add camera options to both selects
+            availableCameras.forEach((camera, index) => {
+                const option1 = document.createElement('option');
+                option1.value = camera.deviceId;
+                option1.textContent = camera.label || `Camera ${index + 1}`;
+                mainCameraSelect.appendChild(option1);
+
+                const option2 = document.createElement('option');
+                option2.value = camera.deviceId;
+                option2.textContent = camera.label || `Camera ${index + 1}`;
+                pipCameraSelect.appendChild(option2);
+            });
+
+            if (availableCameras.length === 0) {
+                // No cameras detected
+                const option1 = document.createElement('option');
+                option1.value = '';
+                option1.textContent = '-- No cameras detected --';
+                mainCameraSelect.appendChild(option1);
+
+                const option2 = document.createElement('option');
+                option2.value = '';
+                option2.textContent = '-- No cameras detected --';
+                pipCameraSelect.appendChild(option2);
+            }
+        } catch (error) {
+            console.error('Error getting cameras:', error);
+            alert('Could not access cameras. Please ensure camera permissions are granted.');
+        }
+    }
+
+    // Update UI after permission is granted
+    function updateUIAfterPermission() {
+        permissionPrompt.style.display = 'none';
+
+        // Enable all camera selection dropdowns and buttons
+        mainCameraSelect.disabled = false;
+        pipCameraSelect.disabled = false;
+        startMainBtn.disabled = false;
+        stopMainBtn.disabled = false;
+        startPipBtn.disabled = false;
+        stopPipBtn.disabled = false;
+        togglePipBtn.disabled = false;
+        swapCamerasBtn.disabled = false;
+        foodDetectionBtn.disabled = false;
+    }
+
+    // Start camera function
+    async function startCamera(type) {
+        const deviceId = type === 'main' ? mainCameraSelect.value : pipCameraSelect.value;
+
+        if (!deviceId) {
+            alert(`Please select a ${type} camera first`);
+            return;
+        }
+
+        try {
+            // Stop existing stream if it exists
+            if (type === 'main' && mainStream) {
+                stopCamera('main');
+            } else if (type === 'pip' && pipStream) {
+                stopCamera('pip');
+            }
+
+            // Request camera stream
+            const constraints = {
+                video: {deviceId: {exact: deviceId}}
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Store the stream and assign to the appropriate video element
+            if (type === 'main') {
+                mainStream = stream;
+                mainVideo.srcObject = stream;
+                mainStatus.textContent = `Main Camera: Active (${getCameraLabel(deviceId)})`;
             } else {
-                console.warn('Could not connect to food detection API. Please start the Python server.');
+                pipStream = stream;
+                pipVideo.srcObject = stream;
+                pipStatus.textContent = `PIP Camera: Active (${getCameraLabel(deviceId)})`;
             }
+        } catch (error) {
+            console.error(`Error starting ${type} camera:`, error);
+            alert(`Could not start ${type} camera: ${error.message}`);
         }
+    }
 
-        // Set up event listeners
-        function setupEventListeners() {
-            requestPermissionBtn.addEventListener('click', requestInitialPermission);
-            startMainBtn.addEventListener('click', () => startCamera('main'));
-            stopMainBtn.addEventListener('click', () => stopCamera('main'));
-            startPipBtn.addEventListener('click', () => startCamera('pip'));
-            stopPipBtn.addEventListener('click', () => stopCamera('pip'));
-            togglePipBtn.addEventListener('click', togglePipVisibility);
-            swapCamerasBtn.addEventListener('click', swapCameras);
-            toggleControlPanelBtn.addEventListener('click', toggleControlPanel);
-            foodDetectionBtn.addEventListener('click', toggleFoodDetection);
+    // Stop camera function
+    function stopCamera(type) {
+        if (type === 'main' && mainStream) {
+            mainStream.getTracks().forEach(track => track.stop());
+            mainStream = null;
+            mainVideo.srcObject = null;
+            mainStatus.textContent = 'Main Camera: Not Active';
 
-            // PIP positioning controls
-            document.getElementById('pip-up').addEventListener('click', () => movePip('up'));
-            document.getElementById('pip-down').addEventListener('click', () => movePip('down'));
-            document.getElementById('pip-left').addEventListener('click', () => movePip('left'));
-            document.getElementById('pip-right').addEventListener('click', () => movePip('right'));
-        }
-
-        // Toggle food detection
-        function toggleFoodDetection() {
-            if (!mainVideo.srcObject) {
-                alert('Please start the main camera first');
-                return;
-            }
-
-            if (foodDetector.isDetecting) {
+            // Stop food detection if active
+            if (foodDetector && foodDetector.isDetecting) {
                 foodDetector.stopDetection();
                 foodDetectionBtn.classList.remove('active');
                 detectionStatus.textContent = 'Food Detection: Off';
-            } else {
-                foodDetector.startDetection(mainVideo, 1500); // Detect every 1.5 seconds
-                foodDetectionBtn.classList.add('active');
-                detectionStatus.textContent = 'Food Detection: Active';
             }
+        } else if (type === 'pip' && pipStream) {
+            pipStream.getTracks().forEach(track => track.stop());
+            pipStream = null;
+            pipVideo.srcObject = null;
+            pipStatus.textContent = 'PIP Camera: Not Active';
+        }
+    }
+
+    // Toggle PIP visibility
+    function togglePipVisibility() {
+        pipVideo.classList.toggle('hidden');
+        togglePipBtn.textContent = pipVideo.classList.contains('hidden') ?
+            'Show PIP Camera' : 'Hide PIP Camera';
+    }
+
+    // Swap cameras between main and PIP
+    async function swapCameras() {
+        const mainDeviceId = mainCameraSelect.value;
+        const pipDeviceId = pipCameraSelect.value;
+
+        if (!mainDeviceId || !pipDeviceId) {
+            alert('Please select both main and PIP cameras to swap');
+            return;
         }
 
-        // Toggle control panel visibility
-        function toggleControlPanel() {
-            controlPanelVisible = !controlPanelVisible;
-            
-            if (controlPanelVisible) {
-                controlPanel.classList.remove('hidden');
-                cameraView.classList.remove('full-width');
-                toggleControlPanelBtn.textContent = '← Hide Panel';
-            } else {
-                controlPanel.classList.add('hidden');
-                cameraView.classList.add('full-width');
-                toggleControlPanelBtn.textContent = 'Show Panel →';
-            }
+        // Store current states
+        const mainActive = mainStream !== null;
+        const pipActive = pipStream !== null;
+
+        // Stop both cameras
+        if (mainActive) stopCamera('main');
+        if (pipActive) stopCamera('pip');
+
+        // Swap selections
+        const tempValue = mainCameraSelect.value;
+        mainCameraSelect.value = pipDeviceId;
+        pipCameraSelect.value = tempValue;
+
+        // Restart cameras with swapped devices
+        if (pipActive) await startCamera('main');
+        if (mainActive) await startCamera('pip');
+    }
+
+    // Move PIP window
+    function movePip(direction) {
+        const pipContainer = document.querySelector('.pip-container');
+        const currentTop = parseInt(getComputedStyle(pipContainer).top) || 0;
+        const currentLeft = parseInt(getComputedStyle(pipContainer).left) || 0;
+
+        switch (direction) {
+            case 'up':
+                pipContainer.style.top = (currentTop - 10) + 'px';
+                break;
+            case 'down':
+                pipContainer.style.top = (currentTop + 10) + 'px';
+                break;
+            case 'left':
+                pipContainer.style.left = (currentLeft - 10) + 'px';
+                break;
+            case 'right':
+                pipContainer.style.left = (currentLeft + 10) + 'px';
+                break;
         }
+    }
 
-        // Request initial camera permission to enable device enumeration
-        async function requestInitialPermission() {
-            try {
-                // First, request temporary camera access to allow device enumeration
-                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                
-                // Stop the temporary stream since we just needed to trigger permission
-                tempStream.getTracks().forEach(track => track.stop());
-                
-                // Now we can enumerate devices
-                await getAvailableCameras();
-                
-                // Update UI to enable controls
-                updateUIAfterPermission();
-            } catch (error) {
-                console.error('Error requesting camera permission:', error);
-                alert('Could not access cameras. Please ensure camera permissions are granted.');
-            }
-        }
+    // Helper function to get camera label
+    function getCameraLabel(deviceId) {
+        const camera = availableCameras.find(cam => cam.deviceId === deviceId);
+        return camera ? (camera.label || 'Unknown Camera') : 'Unknown Camera';
+    }
 
-        // Get available cameras
-        async function getAvailableCameras() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                availableCameras = devices.filter(device => device.kind === 'videoinput');
-                
-                // Clear existing options
-                mainCameraSelect.innerHTML = '<option value="">-- Select a camera --</option>';
-                pipCameraSelect.innerHTML = '<option value="">-- Select a camera --</option>';
-                
-                // Add camera options to both selects
-                availableCameras.forEach((camera, index) => {
-                    const option1 = document.createElement('option');
-                    option1.value = camera.deviceId;
-                    option1.textContent = camera.label || `Camera ${index + 1}`;
-                    mainCameraSelect.appendChild(option1);
-
-                    const option2 = document.createElement('option');
-                    option2.value = camera.deviceId;
-                    option2.textContent = camera.label || `Camera ${index + 1}`;
-                    pipCameraSelect.appendChild(option2);
-                });
-                
-                if (availableCameras.length === 0) {
-                    // No cameras detected
-                    const option1 = document.createElement('option');
-                    option1.value = '';
-                    option1.textContent = '-- No cameras detected --';
-                    mainCameraSelect.appendChild(option1);
-
-                    const option2 = document.createElement('option');
-                    option2.value = '';
-                    option2.textContent = '-- No cameras detected --';
-                    pipCameraSelect.appendChild(option2);
-                }
-            } catch (error) {
-                console.error('Error getting cameras:', error);
-                alert('Could not access cameras. Please ensure camera permissions are granted.');
-            }
-        }
-
-        // Update UI after permission is granted
-        function updateUIAfterPermission() {
-            permissionPrompt.style.display = 'none';
-            
-            // Enable all camera selection dropdowns and buttons
-            mainCameraSelect.disabled = false;
-            pipCameraSelect.disabled = false;
-            startMainBtn.disabled = false;
-            stopMainBtn.disabled = false;
-            startPipBtn.disabled = false;
-            stopPipBtn.disabled = false;
-            togglePipBtn.disabled = false;
-            swapCamerasBtn.disabled = false;
-            foodDetectionBtn.disabled = false;
-        }
-
-        // Start camera function
-        async function startCamera(type) {
-            const deviceId = type === 'main' ? mainCameraSelect.value : pipCameraSelect.value;
-            
-            if (!deviceId) {
-                alert(`Please select a ${type} camera first`);
-                return;
-            }
-
-            try {
-                // Stop existing stream if it exists
-                if (type === 'main' && mainStream) {
-                    stopCamera('main');
-                } else if (type === 'pip' && pipStream) {
-                    stopCamera('pip');
-                }
-
-                // Request camera stream
-                const constraints = {
-                    video: { deviceId: { exact: deviceId } }
-                };
-                
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                // Store the stream and assign to the appropriate video element
-                if (type === 'main') {
-                    mainStream = stream;
-                    mainVideo.srcObject = stream;
-                    mainStatus.textContent = `Main Camera: Active (${getCameraLabel(deviceId)})`;
-                } else {
-                    pipStream = stream;
-                    pipVideo.srcObject = stream;
-                    pipStatus.textContent = `PIP Camera: Active (${getCameraLabel(deviceId)})`;
-                }
-            } catch (error) {
-                console.error(`Error starting ${type} camera:`, error);
-                alert(`Could not start ${type} camera: ${error.message}`);
-            }
-        }
-
-        // Stop camera function
-        function stopCamera(type) {
-            if (type === 'main' && mainStream) {
-                mainStream.getTracks().forEach(track => track.stop());
-                mainStream = null;
-                mainVideo.srcObject = null;
-                mainStatus.textContent = 'Main Camera: Not Active';
-                
-                // Stop food detection if active
-                if (foodDetector && foodDetector.isDetecting) {
-                    foodDetector.stopDetection();
-                    foodDetectionBtn.classList.remove('active');
-                    detectionStatus.textContent = 'Food Detection: Off';
-                }
-            } else if (type === 'pip' && pipStream) {
-                pipStream.getTracks().forEach(track => track.stop());
-                pipStream = null;
-                pipVideo.srcObject = null;
-                pipStatus.textContent = 'PIP Camera: Not Active';
-            }
-        }
-
-        // Toggle PIP visibility
-        function togglePipVisibility() {
-            pipVideo.classList.toggle('hidden');
-            togglePipBtn.textContent = pipVideo.classList.contains('hidden') ? 
-                'Show PIP Camera' : 'Hide PIP Camera';
-        }
-
-        // Swap cameras between main and PIP
-        async function swapCameras() {
-            const mainDeviceId = mainCameraSelect.value;
-            const pipDeviceId = pipCameraSelect.value;
-
-            if (!mainDeviceId || !pipDeviceId) {
-                alert('Please select both main and PIP cameras to swap');
-                return;
-            }
-
-            // Store current states
-            const mainActive = mainStream !== null;
-            const pipActive = pipStream !== null;
-
-            // Stop both cameras
-            if (mainActive) stopCamera('main');
-            if (pipActive) stopCamera('pip');
-
-            // Swap selections
-            const tempValue = mainCameraSelect.value;
-            mainCameraSelect.value = pipDeviceId;
-            pipCameraSelect.value = tempValue;
-
-            // Restart cameras with swapped devices
-            if (pipActive) await startCamera('main');
-            if (mainActive) await startCamera('pip');
-        }
-
-        // Move PIP window
-        function movePip(direction) {
-            const pipContainer = document.querySelector('.pip-container');
-            const currentTop = parseInt(getComputedStyle(pipContainer).top) || 0;
-            const currentLeft = parseInt(getComputedStyle(pipContainer).left) || 0;
-            
-            switch (direction) {
-                case 'up':
-                    pipContainer.style.top = (currentTop - 10) + 'px';
-                    break;
-                case 'down':
-                    pipContainer.style.top = (currentTop + 10) + 'px';
-                    break;
-                case 'left':
-                    pipContainer.style.left = (currentLeft - 10) + 'px';
-                    break;
-                case 'right':
-                    pipContainer.style.left = (currentLeft + 10) + 'px';
-                    break;
-            }
-        }
-
-        // Helper function to get camera label
-        function getCameraLabel(deviceId) {
-            const camera = availableCameras.find(cam => cam.deviceId === deviceId);
-            return camera ? (camera.label || 'Unknown Camera') : 'Unknown Camera';
-        }
-
-        // Initialize the app when the page loads
-        window.addEventListener('load', init);
-    </script>
+    // Initialize the app when the page loads
+    window.addEventListener('load', init);
+</script>
 </body>
 </html>

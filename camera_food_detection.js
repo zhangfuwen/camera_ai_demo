@@ -1,13 +1,16 @@
 // Food detection integration for camera feed
 class FoodDetectionCamera {
-    constructor(apiEndpoint = 'http://localhost:5000') {
-        this.apiEndpoint = apiEndpoint;
+    constructor(videoElementId = 'main-video', overlayCanvasId = 'detection-overlay') {
+        this.apiEndpoint = 'http://localhost:5000';  // Fixed API endpoint
         this.isDetecting = false;
         this.detectionInterval = null;
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d');
-        this.overlayCanvas = document.getElementById('detection-overlay') || this.createOverlayCanvas();
+        this.videoElementId = videoElementId;
+        this.overlayCanvas = document.getElementById(overlayCanvasId) || this.createOverlayCanvas();
         this.overlayCtx = this.overlayCanvas.getContext('2d');
+        this.foodCountElement = document.getElementById('food-count');
+        this.detectionInfoElement = document.getElementById('detection-info');
     }
 
     createOverlayCanvas() {
@@ -20,7 +23,7 @@ class FoodDetectionCamera {
         overlay.style.zIndex = '10';
         
         // Insert after the video element
-        const videoElement = document.getElementById('main-video');
+        const videoElement = document.getElementById(this.videoElementId);
         if (videoElement) {
             videoElement.parentNode.insertBefore(overlay, videoElement.nextSibling);
             this.setCanvasSize(videoElement);
@@ -64,7 +67,21 @@ class FoodDetectionCamera {
             const result = await response.json();
 
             if (result.success) {
+                console.log("Detection successful:", result);
                 this.drawDetections(result.detections);
+                
+                // Update food count display
+                if (this.foodCountElement) {
+                    this.foodCountElement.textContent = result.total_food_items || 0;
+                }
+                if (this.detectionInfoElement) {
+                    if (result.total_food_items > 0) {
+                        this.detectionInfoElement.style.display = 'block';
+                    } else {
+                        this.detectionInfoElement.style.display = 'none';
+                    }
+                }
+                
                 return result;
             } else {
                 console.error('Detection failed:', result.error);
@@ -83,6 +100,14 @@ class FoodDetectionCamera {
         detections.forEach(detection => {
             const box = detection.box;
             const confidence = Math.round(detection.score * 100);
+
+            // Draw mask if available
+            if (detection.mask) {
+                console.log("mask:", detection.mask, "color: ", detection.class_color);
+                this.drawMask(detection.mask, detection.class_color || 'rgba(255, 0, 0, 0.3)');
+            } else {
+                console.log("no mask");
+            }
 
             // Draw bounding box
             this.overlayCtx.strokeStyle = '#FF0000';
@@ -112,6 +137,60 @@ class FoodDetectionCamera {
                 box.ymin - 5
             );
         });
+    }
+
+    drawMask(maskData, color = 'rgba(255, 0, 0, 0.3)') {
+        // Create a temporary canvas to draw the mask
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Set canvas size to match the overlay
+        tempCanvas.width = this.overlayCanvas.width;
+        tempCanvas.height = this.overlayCanvas.height;
+        
+        // If maskData is an array of points (polygon), draw a polygon
+        if (Array.isArray(maskData) && maskData.length > 0) {
+            tempCtx.beginPath();
+            tempCtx.moveTo(maskData[0][0], maskData[0][1]);
+            
+            for (let i = 1; i < maskData.length; i++) {
+                tempCtx.lineTo(maskData[i][0], maskData[i][1]);
+            }
+            
+            tempCtx.closePath();
+            tempCtx.fillStyle = color;
+            tempCtx.fill();
+        } 
+        // If maskData is a binary mask represented as an object with width/height/data
+        else if (maskData && typeof maskData === 'object' && maskData.hasOwnProperty('data')) {
+            // Create image data for the mask
+            const imageData = new ImageData(
+                new Uint8ClampedArray(maskData.data),
+                maskData.width,
+                maskData.height
+            );
+            
+            // Draw the mask at the appropriate position
+            tempCtx.putImageData(imageData, maskData.x || 0, maskData.y || 0);
+            
+            // Apply color to non-transparent pixels
+            const outputImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = outputImageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] > 0) { // If alpha channel is not zero
+                    data[i] = parseInt(color.substring(1, 3), 16);     // R
+                    data[i + 1] = parseInt(color.substring(3, 5), 16); // G
+                    data[i + 2] = parseInt(color.substring(5, 7), 16); // B
+                    data[i + 3] = Math.floor(255 * 0.3);               // A (30% opacity)
+                }
+            }
+            
+            tempCtx.putImageData(outputImageData, 0, 0);
+        }
+        
+        // Draw the mask onto the main overlay canvas
+        this.overlayCtx.drawImage(tempCanvas, 0, 0);
     }
 
     startDetection(videoElement, intervalMs = 1000) {
