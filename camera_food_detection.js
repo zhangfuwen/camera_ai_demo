@@ -11,6 +11,86 @@ class FoodDetectionCamera {
         this.overlayCtx = this.overlayCanvas.getContext('2d');
         this.foodCountElement = document.getElementById('food-count');
         this.detectionInfoElement = document.getElementById('detection-info');
+        
+        // Info overlay panel properties
+        this.infoOverlay = null;
+        this.infoInterval = null;
+        this.createInfoOverlay();
+    }
+
+    createInfoOverlay() {
+        // Create overlay container div
+        this.infoOverlay = document.createElement('div');
+        this.infoOverlay.id = 'info-overlay';
+        this.infoOverlay.style.position = 'absolute';
+        this.infoOverlay.style.top = '10px';
+        this.infoOverlay.style.right = '10px';
+        this.infoOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        this.infoOverlay.style.color = 'white';
+        this.infoOverlay.style.padding = '10px';
+        this.infoOverlay.style.borderRadius = '5px';
+        this.infoOverlay.style.fontSize = '14px';
+        this.infoOverlay.style.zIndex = '20';
+        this.infoOverlay.style.maxWidth = '300px';
+        this.infoOverlay.style.fontFamily = 'Arial, sans-serif';
+        
+        // Add title
+        const title = document.createElement('div');
+        title.textContent = 'Demo Info Panel';
+        title.style.fontWeight = 'bold';
+        title.style.marginBottom = '8px';
+        title.style.textAlign = 'center';
+        this.infoOverlay.appendChild(title);
+        
+        // Add content div
+        this.contentDiv = document.createElement('div');
+        this.contentDiv.id = 'info-content';
+        this.contentDiv.style.minHeight = '20px';
+        this.infoOverlay.appendChild(this.contentDiv);
+        
+        // Insert after the video element
+        const videoElement = document.getElementById(this.videoElementId);
+        if (videoElement) {
+            videoElement.parentNode.insertBefore(this.infoOverlay, videoElement.nextSibling);
+        }
+    }
+
+    updateInfoDisplay() {
+        // Array of random information to display
+        const randomInfos = [
+            `FPS: ${Math.floor(Math.random() * 30) + 1}`,
+            `Objects: ${Math.floor(Math.random() * 10) + 1}`,
+            `Confidence: ${Math.floor(Math.random() * 100) + 1}%`,
+            `Resolution: ${Math.floor(Math.random() * 1000) + 720}p`,
+            `Model: YOLOv8`,
+            `Memory: ${(Math.random() * 8).toFixed(1)} GB`,
+            `Temperature: ${Math.floor(Math.random() * 30) + 20}°C`,
+            `Humidity: ${Math.floor(Math.random() * 50) + 30}%`,
+            `Light: ${Math.floor(Math.random() * 100) + 1}%`,
+            `Battery: ${Math.floor(Math.random() * 100) + 1}%`,
+            `Network: ${['WiFi', 'Ethernet', 'LTE'][Math.floor(Math.random() * 3)]}`
+        ];
+        
+        // Pick a random piece of information
+        const randomInfo = randomInfos[Math.floor(Math.random() * randomInfos.length)];
+        
+        // Update the content
+        this.contentDiv.textContent = randomInfo;
+    }
+
+    startInfoDisplay(intervalMs = 2000) {
+        // Start updating the info display at regular intervals
+        this.updateInfoDisplay(); // Show initial info
+        this.infoInterval = setInterval(() => {
+            this.updateInfoDisplay();
+        }, intervalMs);
+    }
+
+    stopInfoDisplay() {
+        if (this.infoInterval) {
+            clearInterval(this.infoInterval);
+            this.infoInterval = null;
+        }
     }
 
     createOverlayCanvas() {

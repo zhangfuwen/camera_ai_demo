@@ -129,7 +129,7 @@
 
         /* Camera View Styles */
         .camera-view {
-            width: 70%;
+width: 70%;
             display: flex;
             flex-direction: column;
             padding: 20px;
@@ -268,6 +268,25 @@
             <div id="detection-status" class="status-indicator">Food Detection: Off</div>
         </div>
 
+        <!-- Calorie Estimation Section -->
+        <div class="panel-section">
+            <h2 class="panel-title">Calorie Estimation</h2>
+            <div class="calorie-controls">
+                <label for="base-url-input">Google Gemini API Key:</label>
+                <input type="text" id="base-url-input" placeholder="Enter your API base URL" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+
+                <label for="api-key-input">Google Gemini API Key:</label>
+                <input type="password" id="api-key-input" placeholder="Enter your API key" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                
+                <label for="frame-rate-input">Frame Rate (ms):</label>
+                <input type="number" id="frame-rate-input" value="2000" min="500" max="10000" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                
+                <button id="calorie-estimation-btn" class="food-detection-btn" disabled>Start Calorie Estimation</button>
+                <div id="calorie-status" class="status-indicator">Calorie Estimation: Off</div>
+                <div id="total-calories-display" class="status-indicator">Total Calories: 0 cal</div>
+            </div>
+        </div>
+
         <div class="panel-section">
             <h2 class="panel-title">Controls</h2>
             <button id="toggle-pip-btn" disabled>Toggle PIP Visibility</button>
@@ -305,6 +324,9 @@
 <!-- Include the external camera detection script -->
 <script src="camera_food_detection.js"></script>
 
+<!-- Include the calorie estimation script -->
+<script src="calorie_estimation.js"></script>
+
 <script>
     // Global variables to store video streams
     let mainStream = null;
@@ -312,6 +334,16 @@
     let availableCameras = [];
     let controlPanelVisible = true;
     let foodDetector = null;
+    let calorieEstimator = null; // Add calorie estimator instance
+    let sideStream = null;
+
+    // get from local storage
+    const frameRate = localStorage.getItem('calorieFrameRate') || 2000;
+    const baseUrl = localStorage.getItem('calorieBaseUrl') || '';
+    const apiKey = localStorage.getItem('calorieApiKey') || '';
+    document.getElementById('frame-rate-input').value = frameRate;
+    document.getElementById('base-url-input').value = baseUrl;
+    document.getElementById('api-key-input').value = apiKey;
 
     // DOM Elements
     const mainVideo = document.getElementById('main-video');
@@ -333,6 +365,110 @@
     const toggleControlPanelBtn = document.getElementById('toggle-control-panel-btn');
     const foodDetectionBtn = document.getElementById('food-detection-btn');
     const detectionStatus = document.getElementById('detection-status');
+    // Calorie estimation elements
+    const calorieEstimationBtn = document.getElementById('calorie-estimation-btn');
+
+    // function init() {
+    //     // Initialize food detector
+    //     foodDetector = new FoodDetectionCamera('/api/detect', 'main-canvas', 'side-canvas');
+    //
+    //     // Initialize calorie estimator
+    //     calorieEstimator = new CalorieEstimation({
+    //         apiKey: localStorage.getItem('geminiApiKey') || '',
+    //         baseUrl: localStorage.getItem('geminiApiBaseUrl') || '',
+    //         frameRate: parseInt(localStorage.getItem('calorieFrameRate')) || 2000,
+    //         onCalorieUpdate: (data) => {
+    //             document.getElementById('totalCalories').textContent = data.totalEstimatedCalories || 0;
+    //         },
+    //         onError: (error) => {
+    //             console.error('Calorie estimation error:', error);
+    //         }
+    //     });
+    //
+    //     // Restore saved values to UI
+    //     document.getElementById('apiKey').value = localStorage.getItem('geminiApiKey') || '';
+    //     document.getElementById('apiBaseUrl').value = localStorage.getItem('geminiApiBaseUrl') || '';
+    //     document.getElementById('calorieFrameRate').value = parseInt(localStorage.getItem('calorieFrameRate')) || 2000;
+    // }
+    //
+    // function toggleCalorieEstimation() {
+    //     const apiKey = document.getElementById('apiKey').value.trim();
+    //     const baseUrl = document.getElementById('apiBaseUrl').value.trim();
+    //     const frameRate = parseInt(document.getElementById('calorieFrameRate').value);
+    //
+    //     if (!apiKey) {
+    //         alert('Please enter API key');
+    //         return;
+    //     }
+    //
+    //     if (!baseUrl) {
+    //         alert('Please enter API base URL');
+    //         return;
+    //     }
+    //
+    //     if (isNaN(frameRate) || frameRate < 500 || frameRate > 10000) {
+    //         alert('Please enter a valid frame rate between 500 and 10000 ms');
+    //         return;
+    //     }
+    //
+    //     // Save values to localStorage
+    //     localStorage.setItem('geminiApiKey', apiKey);
+    //     localStorage.setItem('geminiApiBaseUrl', baseUrl);
+    //     localStorage.setItem('calorieFrameRate', frameRate.toString());
+    //
+    //     // Update calorie estimator configuration
+    //     calorieEstimator.updateConfig({
+    //         apiKey: apiKey,
+    //         baseUrl: baseUrl,
+    //         frameRate: frameRate
+    //     });
+    //
+    //     if (calorieEstimator.isRunning()) {
+    //         calorieEstimator.stopEstimation();
+    //         document.getElementById('calorieStatus').textContent = 'Calorie Estimation: Off';
+    //         document.getElementById('toggleCalorieBtn').textContent = 'Start Calorie Estimation';
+    //     } else {
+    //         calorieEstimator.startEstimation(mainVideo);
+    //         document.getElementById('calorieStatus').textContent = 'Calorie Estimation: Running';
+    //         document.getElementById('toggleCalorieBtn').textContent = 'Stop Calorie Estimation';
+    //     }
+    // }
+
+    function stopCamera() {
+        if (mainStream) {
+            mainStream.getTracks().forEach(track => track.stop());
+            mainStream = null;
+        }
+        
+        if (sideStream) {
+            sideStream.getTracks().forEach(track => track.stop());
+            sideStream = null;
+        }
+        
+        // Stop food detection if running
+        if (foodDetector) {
+            foodDetector.stopDetection();
+        }
+        
+        // Stop calorie estimation if running
+        if (calorieEstimator && calorieEstimator.isRunning()) {
+            calorieEstimator.stopEstimation();
+            document.getElementById('calorieStatus').textContent = 'Calorie Estimation: Off';
+            document.getElementById('toggleCalorieBtn').textContent = 'Start Calorie Estimation';
+        }
+        
+        document.getElementById('startStopBtn').textContent = 'Start Camera';
+        document.getElementById('detectionStatus').textContent = 'Food Detection: Off';
+    }
+
+    // document.addEventListener('DOMContentLoaded', function() {
+    //     // Add event listener for calorie estimation
+    //     document.getElementById('toggleCalorieBtn').addEventListener('click', toggleCalorieEstimation);
+    // });
+    // const calorieStatus = document.getElementById('calorie-status');
+    // const totalCaloriesDisplay = document.getElementById('total-calories-display');
+    // const apiKeyInput = document.getElementById('api-key-input');
+    // const frameRateInput = document.getElementById('frame-rate-input');
 
     // Initialize the application
     async function init() {
@@ -362,6 +498,11 @@
         toggleControlPanelBtn.addEventListener('click', toggleControlPanel);
         foodDetectionBtn.addEventListener('click', toggleFoodDetection);
 
+        // Add calorie estimation button listener
+        if(calorieEstimationBtn) {
+            calorieEstimationBtn.addEventListener('click', toggleCalorieEstimation);
+        }
+
         // PIP positioning controls
         document.getElementById('pip-up').addEventListener('click', () => movePip('up'));
         document.getElementById('pip-down').addEventListener('click', () => movePip('down'));
@@ -389,6 +530,79 @@
         }
     }
 
+    // Toggle calorie estimation
+    function toggleCalorieEstimation() {
+        if (!mainVideo.srcObject) {
+            alert('Please start the main camera first');
+            return;
+        }
+
+        const baseUrl = document.getElementById('base-url-input').value.trim();
+        if (!baseUrl) {
+            alert('Please enter your Google Gemini API base URL');
+            return;
+        }
+
+        // Get API key from input field (in a real app, you'd want to secure this)
+        const apiKey = document.getElementById('api-key-input').value.trim();
+        if (!apiKey) {
+            alert('Please enter your Google Gemini API key');
+            return;
+        }
+
+        // Get frame rate from input field
+        let frameRate = parseInt(document.getElementById('frame-rate-input').value) || 2000; // Default to 2 seconds
+        // Ensure frame rate is reasonable (between 500ms and 10000ms)
+        frameRate = Math.max(500, Math.min(10000, frameRate));
+
+        // save to local storage
+        localStorage.setItem('calorieFrameRate', frameRate.toString());
+        localStorage.setItem('calorieBaseUrl', baseUrl)
+        localStorage.setItem('calorieApiKey', apiKey)
+
+        if (calorieEstimator && calorieEstimator.isEstimating) {
+            calorieEstimator.stopEstimation();
+            calorieEstimationBtn.classList.remove('active');
+            calorieEstimationBtn.innerHTML="Start Calorie Estimation";
+            calorieStatus.textContent = 'Calorie Estimation: Off';
+        } else {
+            // Initialize calorie estimator with API key and options
+            calorieEstimator = new CalorieEstimation(apiKey, {
+                frameRate: frameRate,
+                onCalorieUpdate: function(updateData) {
+                    // Update the total calories display
+                    if(totalCaloriesDisplay) {
+                        totalCaloriesDisplay.textContent = Math.round(updateData.totalCalories);
+                    }
+                    
+                    // Update status with current info
+                    if(calorieStatus) {
+                        calorieStatus.innerHTML = `Calorie Estimation: Active | Total: ${Math.round(updateData.totalCalories)} cal`;
+                    }
+                    
+                    console.log('Calorie update:', updateData);
+                },
+                onError: function(error) {
+                    console.error('Calorie estimation error:', error);
+                    if(calorieStatus) {
+                        calorieStatus.textContent = `Calorie Estimation: Error - ${error.message}`;
+                    }
+                }
+            });
+
+            calorieEstimator.updateConfig({
+                baseUrl: baseUrl,
+                apiKey: apiKey,
+                frameRate: frameRate
+            })
+
+            calorieEstimator.startEstimation(mainVideo);
+            calorieEstimationBtn.classList.add('active');
+            calorieEstimationBtn.innerHTML="Stop Calorie Estimation";
+            calorieStatus.textContent = 'Calorie Estimation: Starting...';
+        }
+    }
+
     // Toggle control panel visibility
     function toggleControlPanel() {
         controlPanelVisible = !controlPanelVisible;
@@ -406,6 +620,7 @@
 
     // Request initial camera permission to enable device enumeration
     async function requestInitialPermission() {
+        console.log("requesting initial permission")
         try {
             // First, request temporary camera access to allow device enumeration
             const tempStream = await navigator.mediaDevices.getUserMedia({video: true});
@@ -479,6 +694,11 @@
         togglePipBtn.disabled = false;
         swapCamerasBtn.disabled = false;
         foodDetectionBtn.disabled = false;
+        
+        // Enable calorie estimation button if elements exist
+        if(calorieEstimationBtn) {
+            calorieEstimationBtn.disabled = false;
+        }
     }
 
     // Start camera function
@@ -534,6 +754,18 @@
                 foodDetector.stopDetection();
                 foodDetectionBtn.classList.remove('active');
                 detectionStatus.textContent = 'Food Detection: Off';
+            }
+            
+            // Stop calorie estimation if active
+            if (calorieEstimator && calorieEstimator.isEstimating) {
+                calorieEstimator.stopEstimation();
+                if(calorieEstimationBtn) {
+                    calorieEstimationBtn.classList.remove('active');
+                    calorieEstimationBtn.innerHTML = "Start Calorie Estimation";
+                }
+                if(calorieStatus) {
+                    calorieStatus.textContent = 'Calorie Estimation: Off';
+                }
             }
         } else if (type === 'pip' && pipStream) {
             pipStream.getTracks().forEach(track => track.stop());
