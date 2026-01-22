@@ -127,7 +127,7 @@ export class FoodDetectionController {
             const base64Image = imageData.split(',')[1];
             
             // Send to backend API
-            const response = await fetch('/detect_food', {
+            const response = await fetch('http://localhost:5001/detect_food', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -203,13 +203,66 @@ export class FoodDetectionController {
 
         // Draw each detection
         detections.forEach(detection => {
-            const { label, score, box } = detection;
+            const { label, score, box, mask } = detection;
             
             // Scale bounding box coordinates to match display size
             const scaledX1 = box.xmin * scaleX;
             const scaledY1 = box.ymin * scaleY;
             const scaledWidth = (box.xmax - box.xmin) * scaleX;
             const scaledHeight = (box.ymax - box.ymin) * scaleY;
+            
+            // Draw segmentation mask if available
+            if (mask && mask.length > 0) {
+                // Create a temporary canvas for the mask
+                const maskCanvas = document.createElement('canvas');
+                const maskCtx = maskCanvas.getContext('2d');
+                
+                // Set mask canvas size to match the scaled bounding box
+                maskCanvas.width = Math.round(scaledWidth);
+                maskCanvas.height = Math.round(scaledHeight);
+                
+                // Create image data from mask array
+                const maskImageData = maskCtx.createImageData(maskCanvas.width, maskCanvas.height);
+                const maskData = maskImageData.data;
+                
+                // Calculate mask dimensions
+                const maskHeight = mask.length;
+                const maskWidth = mask[0].length;
+                
+                // Scale mask to fit the bounding box
+                for (let y = 0; y < maskCanvas.height; y++) {
+                    for (let x = 0; x < maskCanvas.width; x++) {
+                        // Map canvas coordinates to mask coordinates
+                        const maskY = Math.floor((y / maskCanvas.height) * maskHeight);
+                        const maskX = Math.floor((x / maskCanvas.width) * maskWidth);
+                        
+                        // Get mask value (0 or 1)
+                        const maskValue = mask[maskY] && mask[maskY][maskX] ? mask[maskY][maskX] : 0;
+                        
+                        // Set pixel color with transparency
+                        const pixelIndex = (y * maskCanvas.width + x) * 4;
+                        if (maskValue > 0) {
+                            // Semi-transparent green for mask
+                            maskData[pixelIndex] = 0;     // R
+                            maskData[pixelIndex + 1] = 255; // G
+                            maskData[pixelIndex + 2] = 0;   // B
+                            maskData[pixelIndex + 3] = 100; // A (transparency)
+                        } else {
+                            // Transparent for non-mask areas
+                            maskData[pixelIndex] = 0;
+                            maskData[pixelIndex + 1] = 0;
+                            maskData[pixelIndex + 2] = 0;
+                            maskData[pixelIndex + 3] = 0;
+                        }
+                    }
+                }
+                
+                // Put the mask image data on the mask canvas
+                maskCtx.putImageData(maskImageData, 0, 0);
+                
+                // Draw the mask on the main canvas
+                this.ctx.drawImage(maskCanvas, scaledX1, scaledY1);
+            }
             
             // Draw bounding box
             this.ctx.strokeStyle = '#00FF00';
