@@ -4,842 +4,406 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Camera AI Demo with Food Detection</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .container {
-            display: flex;
-            height: 100vh;
-        }
-
-        /* Control Panel Styles */
-        .control-panel {
-            width: 30%;
-            background-color: #f0f0f0;
-            padding: 20px;
-            overflow-y: auto;
-            border-right: 1px solid #ccc;
-            transition: all 0.3s ease;
-        }
-
-        .control-panel.hidden {
-            width: 0;
-            padding: 0 0 0 0;
-            overflow: hidden;
-            border-right: none;
-        }
-
-        .panel-section {
-            margin-bottom: 25px;
-        }
-
-        .panel-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .camera-selector {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        select, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        .btn-stop {
-            background-color: #dc3545;
-        }
-
-        .btn-stop:hover {
-            background-color: #c82333;
-        }
-
-        .request-permission-btn {
-            background-color: #28a745;
-        }
-
-        .request-permission-btn:hover {
-            background-color: #218838;
-        }
-
-        .toggle-control-panel-btn {
-            background-color: #6c757d;
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 100;
-            width: auto;
-            padding: 8px 12px;
-            font-size: 14px;
-        }
-
-        .toggle-control-panel-btn:hover {
-            background-color: #5a6268;
-        }
-
-        .food-detection-btn {
-            background-color: #fd7e14;
-        }
-
-        .food-detection-btn:hover {
-            background-color: #e06b0f;
-        }
-
-        .food-detection-btn.active {
-            background-color: #6f42c1;
-        }
-
-        .food-detection-btn.active:hover {
-            background-color: #5a32a3;
-        }
-
-        /* Camera View Styles */
-        .camera-view {
-width: 70%;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            background-color: #000;
-            transition: width 0.3s ease;
-        }
-
-        .camera-view.full-width {
-            width: 100%;
-        }
-
-        .main-camera-container {
-            position: relative;
-            flex-grow: 1;
-            min-height: 0;
-            margin-bottom: 20px;
-        }
-
-        #main-video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            background-color: #333;
+        /* Custom styles for video elements that can't be handled by Tailwind */
+        #main-video, #pip-video {
             transform: scaleX(-1);
             -webkit-transform: scaleX(-1); /* For older Safari versions */
             -moz-transform: scaleX(-1); /* For older Firefox versions */
         }
-
-        #detection-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        .pip-container {
-            position: relative;
-            height: 200px;
-            width: 100%;
-        }
-
-        #pip-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            background-color: #333;
-        }
-
-        .pip-controls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 10;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 5px;
-            border-radius: 4px;
-        }
-
-        .pip-controls button {
-            width: auto;
-            padding: 5px 10px;
-            margin-left: 5px;
-            font-size: 12px;
-        }
-
-        .status-indicator {
-            color: white;
-            text-align: center;
-            padding: 10px;
-            font-size: 14px;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .permission-prompt {
-            text-align: center;
-            padding: 20px;
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-
-        .detection-info {
-            position: absolute;
-            top: 50px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 14px;
-            z-index: 20;
-        }
     </style>
 </head>
-<body>
-<div class="container">
-    <!-- Control Panel -->
-    <div class="control-panel" id="control-panel">
-        <div class="permission-prompt" id="permission-prompt">
-            <p>Please grant camera permission to detect available cameras</p>
-            <button id="request-permission-btn" class="request-permission-btn">Request Camera Permission</button>
-        </div>
+<body class="h-screen overflow-hidden bg-gray-900 text-white">
+    <div id="app" class="flex h-full">
+        <!-- Control Panel Container -->
+        <div id="control-panel-container" class="flex-shrink-0 w-[350px] min-w-[250px] max-w-[500px] transition-all duration-300 resize-x overflow-hidden"></div>
+        
+        <!-- Camera View Container -->
+        <div id="camera-view-container" class="flex-grow transition-all duration-300"></div>
+        
+        <!-- Menu Toggle Button -->
+        <button id="menu-toggle-btn" class="fixed top-4 right-4 z-50 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
 
-        <div class="panel-section">
-            <h2 class="panel-title">Main Camera</h2>
-            <div class="camera-selector">
-                <label for="main-camera-select">Select Main Camera:</label>
-                <select id="main-camera-select" disabled>
-                    <option value="">-- Select a camera --</option>
-                </select>
+        <!-- Toggle Control Panel Button -->
+        <button id="toggle-control-panel-btn" class="absolute top-4 left-4 z-50 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Hide Panel
+        </button>
+        <!-- Side Menu -->
+        <div id="side-menu" class="fixed top-0 right-0 h-full w-64 bg-gray-800 transform translate-x-full transition-transform duration-300 z-40">
+            <div class="p-4">
+                <h3 class="text-xl font-bold text-white mb-4">Menu</h3>
+                <ul class="space-y-2">
+                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">Home</a></li>
+                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">Settings</a></li>
+                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">Help</a></li>
+                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">About</a></li>
+                </ul>
             </div>
-            <button id="start-main-btn" disabled>Start Main Camera</button>
-            <button id="stop-main-btn" class="btn-stop" disabled>Stop Main Camera</button>
-        </div>
-
-        <div class="panel-section">
-            <h2 class="panel-title">PIP Camera</h2>
-            <div class="camera-selector">
-                <label for="pip-camera-select">Select PIP Camera:</label>
-                <select id="pip-camera-select" disabled>
-                    <option value="">-- Select a camera --</option>
-                </select>
-            </div>
-            <button id="start-pip-btn" disabled>Start PIP Camera</button>
-            <button id="stop-pip-btn" class="btn-stop" disabled>Stop PIP Camera</button>
-        </div>
-
-        <div class="panel-section">
-            <h2 class="panel-title">Food Detection</h2>
-            <button id="food-detection-btn" class="food-detection-btn" disabled>Start Food Detection</button>
-            <div id="detection-status" class="status-indicator">Food Detection: Off</div>
-        </div>
-
-        <!-- Calorie Estimation Section -->
-        <div class="panel-section">
-            <h2 class="panel-title">Calorie Estimation</h2>
-            <div class="calorie-controls">
-                <label for="base-url-input">Google Gemini API Key:</label>
-                <input type="text" id="base-url-input" placeholder="Enter your API base URL" style="width: 100%; padding: 8px; margin-bottom: 10px;">
-
-                <label for="api-key-input">Google Gemini API Key:</label>
-                <input type="password" id="api-key-input" placeholder="Enter your API key" style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                
-                <label for="frame-rate-input">Frame Rate (ms):</label>
-                <input type="number" id="frame-rate-input" value="2000" min="500" max="10000" style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                
-                <button id="calorie-estimation-btn" class="food-detection-btn" disabled>Start Calorie Estimation</button>
-                <div id="calorie-status" class="status-indicator">Calorie Estimation: Off</div>
-                <div id="total-calories-display" class="status-indicator">Total Calories: 0 cal</div>
-            </div>
-        </div>
-
-        <div class="panel-section">
-            <h2 class="panel-title">Controls</h2>
-            <button id="toggle-pip-btn" disabled>Toggle PIP Visibility</button>
-            <button id="swap-cameras-btn" disabled>Swap Cameras</button>
-        </div>
-
-        <div class="panel-section">
-            <h2 class="panel-title">Status</h2>
-            <div id="main-status" class="status-indicator">Main Camera: Not Active</div>
-            <div id="pip-status" class="status-indicator">PIP Camera: Not Active</div>
         </div>
     </div>
 
-    <!-- Camera View -->
-    <div class="camera-view" id="camera-view">
-        <button id="toggle-control-panel-btn" class="toggle-control-panel-btn">← Hide Panel</button>
-        <div id="detection-info" class="detection-info" style="display: none;">Food Items Detected: <span
-                id="food-count">0</span></div>
-        <div class="main-camera-container">
-            <video id="main-video" autoplay muted playsinline></video>
-            <canvas id="detection-overlay"></canvas>
-        </div>
-        <div class="pip-container">
-            <div class="pip-controls">
-                <button id="pip-up">↑</button>
-                <button id="pip-down">↓</button>
-                <button id="pip-left">←</button>
-                <button id="pip-right">→</button>
+    <!-- Templates for UI Components -->
+    <template id="control-panel-template">
+        <div class="h-full w-full bg-gray-800 p-5 overflow-y-auto border-r border-gray-700 transition-all duration-300" id="control-panel">
+            <!-- Permission Prompt -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Permission Prompt</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div id="permission-prompt" class="text-center p-5 bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded">
+                        <p class="mb-3">Please grant camera permission to detect available cameras</p>
+                        <button id="request-permission-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Request Camera Permission
+                        </button>
+                    </div>
+                </div>
             </div>
-            <video id="pip-video" autoplay muted playsinline></video>
+
+            <!-- Main Camera Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Main Camera</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="mb-4">
+                        <label for="main-camera-select" class="block mb-2 font-bold text-gray-300">Select Main Camera:</label>
+                        <select id="main-camera-select" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white" disabled>
+                            <option value="">-- Select a camera --</option>
+                        </select>
+                    </div>
+                    <button id="toggle-main-btn" class="w-full p-3 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Start Main Camera
+                    </button>
+                </div>
+            </div>
+
+            <!-- PIP Camera Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>PIP Camera</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="mb-4">
+                        <label for="pip-camera-select" class="block mb-2 font-bold text-gray-300">Select PIP Camera:</label>
+                        <select id="pip-camera-select" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white" disabled>
+                            <option value="">-- Select a camera --</option>
+                        </select>
+                    </div>
+                    <button id="toggle-pip-camera-btn" class="w-full p-3 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Start PIP Camera
+                    </button>
+                </div>
+            </div>
+
+            <!-- Food Detection Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Food Detection</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <button id="food-detection-btn" class="w-full p-3 mb-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Start Food Detection
+                    </button>
+                    <div id="detection-status" class="text-center p-2 text-sm bg-gray-700 rounded">Food Detection: Off</div>
+                </div>
+            </div>
+
+            <!-- Calorie Estimation Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Calorie Estimation</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="space-y-4">
+                        <button id="calorie-estimation-btn" class="w-full p-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            Start Calorie Estimation
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Configuration Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>LLM Configuration</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="space-y-2">
+                        <div class="mb-4">
+                            <label for="video-file-input" class="block mb-2 font-bold text-gray-300">Select Local Video:</label>
+                            <input type="file" id="video-file-input" accept="video/*" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white">
+                            <div id="remembered-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
+                            <div id="video-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
+                            <button id="clear-remembered-file" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden">Clear Remembered File</button>
+                        </div>
+                        <button id="configure-llm-btn" class="w-full p-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded transition-colors">Configure LLM</button>
+                        <button id="parse-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors" disabled>LLM Video Test</button>
+                        <div id="video-processing-progress" class="mt-3 hidden">
+                            <div class="w-full bg-gray-700 rounded">
+                                <div id="video-progress-bar" class="bg-green-500 h-5 rounded text-center leading-5 text-white" style="width: 0%">0%</div>
+                            </div>
+                            <div id="video-progress-text" class="mt-2 text-xs"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Recorder Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Video Recorder</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="space-y-2">
+                        <button id="record-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Start Recording
+                        </button>
+                        <button id="save-recorded-video-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save Recording
+                        </button>
+                        <div id="recording-status" class="text-center p-2 text-sm bg-gray-700 rounded mt-3">Recording: Not Active</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Configuration Panel (Hidden by default) -->
+            <div id="llm-config-panel" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold">Configure LLM Settings</h3>
+                        <button id="close-config-btn" class="text-gray-400 hover:text-white text-2xl leading-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="llm-config-content" class="space-y-4">
+                        <!-- Dynamic content will be inserted here -->
+                    </div>
+                    <div class="flex justify-end mt-6 space-x-2">
+                        <button id="save-llm-config-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save Configuration
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
+    </template>
 
-<!-- Include the external camera detection script -->
-<script src="camera_food_detection.js"></script>
+    <template id="camera-view-template">
+        <div class="h-full w-full flex flex-col p-5 bg-black transition-all duration-300" id="camera-view">
 
-<!-- Include the calorie estimation script -->
-<script src="calorie_estimation.js"></script>
-
-<script>
-    // Global variables to store video streams
-    let mainStream = null;
-    let pipStream = null;
-    let availableCameras = [];
-    let controlPanelVisible = true;
-    let foodDetector = null;
-    let calorieEstimator = null; // Add calorie estimator instance
-    let sideStream = null;
-
-    // get from local storage
-    const frameRate = localStorage.getItem('calorieFrameRate') || 2000;
-    const baseUrl = localStorage.getItem('calorieBaseUrl') || '';
-    const apiKey = localStorage.getItem('calorieApiKey') || '';
-    document.getElementById('frame-rate-input').value = frameRate;
-    document.getElementById('base-url-input').value = baseUrl;
-    document.getElementById('api-key-input').value = apiKey;
-
-    // DOM Elements
-    const mainVideo = document.getElementById('main-video');
-    const pipVideo = document.getElementById('pip-video');
-    const mainCameraSelect = document.getElementById('main-camera-select');
-    const pipCameraSelect = document.getElementById('pip-camera-select');
-    const startMainBtn = document.getElementById('start-main-btn');
-    const stopMainBtn = document.getElementById('stop-main-btn');
-    const startPipBtn = document.getElementById('start-pip-btn');
-    const stopPipBtn = document.getElementById('stop-pip-btn');
-    const togglePipBtn = document.getElementById('toggle-pip-btn');
-    const swapCamerasBtn = document.getElementById('swap-cameras-btn');
-    const mainStatus = document.getElementById('main-status');
-    const pipStatus = document.getElementById('pip-status');
-    const permissionPrompt = document.getElementById('permission-prompt');
-    const requestPermissionBtn = document.getElementById('request-permission-btn');
-    const controlPanel = document.getElementById('control-panel');
-    const cameraView = document.getElementById('camera-view');
-    const toggleControlPanelBtn = document.getElementById('toggle-control-panel-btn');
-    const foodDetectionBtn = document.getElementById('food-detection-btn');
-    const detectionStatus = document.getElementById('detection-status');
-    // Calorie estimation elements
-    const calorieEstimationBtn = document.getElementById('calorie-estimation-btn');
-
-    // function init() {
-    //     // Initialize food detector
-    //     foodDetector = new FoodDetectionCamera('/api/detect', 'main-canvas', 'side-canvas');
-    //
-    //     // Initialize calorie estimator
-    //     calorieEstimator = new CalorieEstimation({
-    //         apiKey: localStorage.getItem('geminiApiKey') || '',
-    //         baseUrl: localStorage.getItem('geminiApiBaseUrl') || '',
-    //         frameRate: parseInt(localStorage.getItem('calorieFrameRate')) || 2000,
-    //         onCalorieUpdate: (data) => {
-    //             document.getElementById('totalCalories').textContent = data.totalEstimatedCalories || 0;
-    //         },
-    //         onError: (error) => {
-    //             console.error('Calorie estimation error:', error);
-    //         }
-    //     });
-    //
-    //     // Restore saved values to UI
-    //     document.getElementById('apiKey').value = localStorage.getItem('geminiApiKey') || '';
-    //     document.getElementById('apiBaseUrl').value = localStorage.getItem('geminiApiBaseUrl') || '';
-    //     document.getElementById('calorieFrameRate').value = parseInt(localStorage.getItem('calorieFrameRate')) || 2000;
-    // }
-    //
-    // function toggleCalorieEstimation() {
-    //     const apiKey = document.getElementById('apiKey').value.trim();
-    //     const baseUrl = document.getElementById('apiBaseUrl').value.trim();
-    //     const frameRate = parseInt(document.getElementById('calorieFrameRate').value);
-    //
-    //     if (!apiKey) {
-    //         alert('Please enter API key');
-    //         return;
-    //     }
-    //
-    //     if (!baseUrl) {
-    //         alert('Please enter API base URL');
-    //         return;
-    //     }
-    //
-    //     if (isNaN(frameRate) || frameRate < 500 || frameRate > 10000) {
-    //         alert('Please enter a valid frame rate between 500 and 10000 ms');
-    //         return;
-    //     }
-    //
-    //     // Save values to localStorage
-    //     localStorage.setItem('geminiApiKey', apiKey);
-    //     localStorage.setItem('geminiApiBaseUrl', baseUrl);
-    //     localStorage.setItem('calorieFrameRate', frameRate.toString());
-    //
-    //     // Update calorie estimator configuration
-    //     calorieEstimator.updateConfig({
-    //         apiKey: apiKey,
-    //         baseUrl: baseUrl,
-    //         frameRate: frameRate
-    //     });
-    //
-    //     if (calorieEstimator.isRunning()) {
-    //         calorieEstimator.stopEstimation();
-    //         document.getElementById('calorieStatus').textContent = 'Calorie Estimation: Off';
-    //         document.getElementById('toggleCalorieBtn').textContent = 'Start Calorie Estimation';
-    //     } else {
-    //         calorieEstimator.startEstimation(mainVideo);
-    //         document.getElementById('calorieStatus').textContent = 'Calorie Estimation: Running';
-    //         document.getElementById('toggleCalorieBtn').textContent = 'Stop Calorie Estimation';
-    //     }
-    // }
-
-    function stopCamera() {
-        if (mainStream) {
-            mainStream.getTracks().forEach(track => track.stop());
-            mainStream = null;
-        }
-        
-        if (sideStream) {
-            sideStream.getTracks().forEach(track => track.stop());
-            sideStream = null;
-        }
-        
-        // Stop food detection if running
-        if (foodDetector) {
-            foodDetector.stopDetection();
-        }
-        
-        // Stop calorie estimation if running
-        if (calorieEstimator && calorieEstimator.isRunning()) {
-            calorieEstimator.stopEstimation();
-            document.getElementById('calorieStatus').textContent = 'Calorie Estimation: Off';
-            document.getElementById('toggleCalorieBtn').textContent = 'Start Calorie Estimation';
-        }
-        
-        document.getElementById('startStopBtn').textContent = 'Start Camera';
-        document.getElementById('detectionStatus').textContent = 'Food Detection: Off';
-    }
-
-    // document.addEventListener('DOMContentLoaded', function() {
-    //     // Add event listener for calorie estimation
-    //     document.getElementById('toggleCalorieBtn').addEventListener('click', toggleCalorieEstimation);
-    // });
-    // const calorieStatus = document.getElementById('calorie-status');
-    // const totalCaloriesDisplay = document.getElementById('total-calories-display');
-    // const apiKeyInput = document.getElementById('api-key-input');
-    // const frameRateInput = document.getElementById('frame-rate-input');
-
-    // Initialize the application
-    async function init() {
-        setupEventListeners();
-
-        // Initialize food detector
-        foodDetector = new FoodDetectionCamera('main-video', 'detection-overlay');
-
-        // Test connection to backend
-        const isConnected = await foodDetector.testConnection();
-        if (isConnected) {
-            console.log('Successfully connected to food detection API');
-        } else {
-            console.warn('Could not connect to food detection API. Please start the Python server.');
-        }
-    }
-
-    // Set up event listeners
-    function setupEventListeners() {
-        requestPermissionBtn.addEventListener('click', requestInitialPermission);
-        startMainBtn.addEventListener('click', () => startCamera('main'));
-        stopMainBtn.addEventListener('click', () => stopCamera('main'));
-        startPipBtn.addEventListener('click', () => startCamera('pip'));
-        stopPipBtn.addEventListener('click', () => stopCamera('pip'));
-        togglePipBtn.addEventListener('click', togglePipVisibility);
-        swapCamerasBtn.addEventListener('click', swapCameras);
-        toggleControlPanelBtn.addEventListener('click', toggleControlPanel);
-        foodDetectionBtn.addEventListener('click', toggleFoodDetection);
-
-        // Add calorie estimation button listener
-        if(calorieEstimationBtn) {
-            calorieEstimationBtn.addEventListener('click', toggleCalorieEstimation);
-        }
-
-        // PIP positioning controls
-        document.getElementById('pip-up').addEventListener('click', () => movePip('up'));
-        document.getElementById('pip-down').addEventListener('click', () => movePip('down'));
-        document.getElementById('pip-left').addEventListener('click', () => movePip('left'));
-        document.getElementById('pip-right').addEventListener('click', () => movePip('right'));
-    }
-
-    // Toggle food detection
-    function toggleFoodDetection() {
-        if (!mainVideo.srcObject) {
-            alert('Please start the main camera first');
-            return;
-        }
-
-        if (foodDetector.isDetecting) {
-            foodDetector.stopDetection();
-            foodDetectionBtn.classList.remove('active');
-            foodDetectionBtn.innerHTML="Start Food Detection";
-            detectionStatus.textContent = 'Food Detection: Off';
-        } else {
-            foodDetector.startDetection(mainVideo, 1500); // Detect every 1.5 seconds
-            foodDetectionBtn.classList.add('active');
-            foodDetectionBtn.innerHTML="Stop Food Detection";
-            detectionStatus.textContent = 'Food Detection: Active';
-        }
-    }
-
-    // Toggle calorie estimation
-    function toggleCalorieEstimation() {
-        if (!mainVideo.srcObject) {
-            alert('Please start the main camera first');
-            return;
-        }
-
-        const baseUrl = document.getElementById('base-url-input').value.trim();
-        if (!baseUrl) {
-            alert('Please enter your Google Gemini API base URL');
-            return;
-        }
-
-        // Get API key from input field (in a real app, you'd want to secure this)
-        const apiKey = document.getElementById('api-key-input').value.trim();
-        if (!apiKey) {
-            alert('Please enter your Google Gemini API key');
-            return;
-        }
-
-        // Get frame rate from input field
-        let frameRate = parseInt(document.getElementById('frame-rate-input').value) || 2000; // Default to 2 seconds
-        // Ensure frame rate is reasonable (between 500ms and 10000ms)
-        frameRate = Math.max(500, Math.min(10000, frameRate));
-
-        // save to local storage
-        localStorage.setItem('calorieFrameRate', frameRate.toString());
-        localStorage.setItem('calorieBaseUrl', baseUrl)
-        localStorage.setItem('calorieApiKey', apiKey)
-
-        if (calorieEstimator && calorieEstimator.isEstimating) {
-            calorieEstimator.stopEstimation();
-            calorieEstimationBtn.classList.remove('active');
-            calorieEstimationBtn.innerHTML="Start Calorie Estimation";
-            calorieStatus.textContent = 'Calorie Estimation: Off';
-        } else {
-            // Initialize calorie estimator with API key and options
-            calorieEstimator = new CalorieEstimation(apiKey, {
-                frameRate: frameRate,
-                onCalorieUpdate: function(updateData) {
-                    // Update the total calories display
-                    if(totalCaloriesDisplay) {
-                        totalCaloriesDisplay.textContent = Math.round(updateData.totalCalories);
-                    }
-                    
-                    // Update status with current info
-                    if(calorieStatus) {
-                        calorieStatus.innerHTML = `Calorie Estimation: Active | Total: ${Math.round(updateData.totalCalories)} cal`;
-                    }
-                    
-                    console.log('Calorie update:', updateData);
-                },
-                onError: function(error) {
-                    console.error('Calorie estimation error:', error);
-                    if(calorieStatus) {
-                        calorieStatus.textContent = `Calorie Estimation: Error - ${error.message}`;
-                    }
-                }
-            });
-
-            calorieEstimator.updateConfig({
-                baseUrl: baseUrl,
-                apiKey: apiKey,
-                frameRate: frameRate
-            })
-
-            calorieEstimator.startEstimation(mainVideo);
-            calorieEstimationBtn.classList.add('active');
-            calorieEstimationBtn.innerHTML="Stop Calorie Estimation";
-            calorieStatus.textContent = 'Calorie Estimation: Starting...';
-        }
-    }
-
-    // Toggle control panel visibility
-    function toggleControlPanel() {
-        controlPanelVisible = !controlPanelVisible;
-
-        if (controlPanelVisible) {
-            controlPanel.classList.remove('hidden');
-            cameraView.classList.remove('full-width');
-            toggleControlPanelBtn.textContent = '← Hide Panel';
-        } else {
-            controlPanel.classList.add('hidden');
-            cameraView.classList.add('full-width');
-            toggleControlPanelBtn.textContent = 'Show Panel →';
-        }
-    }
-
-    // Request initial camera permission to enable device enumeration
-    async function requestInitialPermission() {
-        console.log("requesting initial permission")
-        try {
-            // First, request temporary camera access to allow device enumeration
-            const tempStream = await navigator.mediaDevices.getUserMedia({video: true});
-
-            // Stop the temporary stream since we just needed to trigger permission
-            tempStream.getTracks().forEach(track => track.stop());
-
-            // Now we can enumerate devices
-            await getAvailableCameras();
-
-            // Update UI to enable controls
-            updateUIAfterPermission();
-        } catch (error) {
-            console.error('Error requesting camera permission:', error);
-            alert('Could not access cameras. Please ensure camera permissions are granted.');
-        }
-    }
-
-    // Get available cameras
-    async function getAvailableCameras() {
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            availableCameras = devices.filter(device => device.kind === 'videoinput');
-
-            // Clear existing options
-            mainCameraSelect.innerHTML = '<option value="">-- Select a camera --</option>';
-            pipCameraSelect.innerHTML = '<option value="">-- Select a camera --</option>';
-
-            // Add camera options to both selects
-            availableCameras.forEach((camera, index) => {
-                const option1 = document.createElement('option');
-                option1.value = camera.deviceId;
-                option1.textContent = camera.label || `Camera ${index + 1}`;
-                mainCameraSelect.appendChild(option1);
-
-                const option2 = document.createElement('option');
-                option2.value = camera.deviceId;
-                option2.textContent = camera.label || `Camera ${index + 1}`;
-                pipCameraSelect.appendChild(option2);
-            });
-
-            if (availableCameras.length === 0) {
-                // No cameras detected
-                const option1 = document.createElement('option');
-                option1.value = '';
-                option1.textContent = '-- No cameras detected --';
-                mainCameraSelect.appendChild(option1);
-
-                const option2 = document.createElement('option');
-                option2.value = '';
-                option2.textContent = '-- No cameras detected --';
-                pipCameraSelect.appendChild(option2);
-            }
-        } catch (error) {
-            console.error('Error getting cameras:', error);
-            alert('Could not access cameras. Please ensure camera permissions are granted.');
-        }
-    }
-
-    // Update UI after permission is granted
-    function updateUIAfterPermission() {
-        permissionPrompt.style.display = 'none';
-
-        // Enable all camera selection dropdowns and buttons
-        mainCameraSelect.disabled = false;
-        pipCameraSelect.disabled = false;
-        startMainBtn.disabled = false;
-        stopMainBtn.disabled = false;
-        startPipBtn.disabled = false;
-        stopPipBtn.disabled = false;
-        togglePipBtn.disabled = false;
-        swapCamerasBtn.disabled = false;
-        foodDetectionBtn.disabled = false;
-        
-        // Enable calorie estimation button if elements exist
-        if(calorieEstimationBtn) {
-            calorieEstimationBtn.disabled = false;
-        }
-    }
-
-    // Start camera function
-    async function startCamera(type) {
-        const deviceId = type === 'main' ? mainCameraSelect.value : pipCameraSelect.value;
-
-        if (!deviceId) {
-            alert(`Please select a ${type} camera first`);
-            return;
-        }
-
-        try {
-            // Stop existing stream if it exists
-            if (type === 'main' && mainStream) {
-                stopCamera('main');
-            } else if (type === 'pip' && pipStream) {
-                stopCamera('pip');
-            }
-
-            // Request camera stream
-            const constraints = {
-                video: {deviceId: {exact: deviceId}}
-            };
-
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-            // Store the stream and assign to the appropriate video element
-            if (type === 'main') {
-                mainStream = stream;
-                mainVideo.srcObject = stream;
-                mainStatus.textContent = `Main Camera: Active (${getCameraLabel(deviceId)})`;
-            } else {
-                pipStream = stream;
-                pipVideo.srcObject = stream;
-                pipStatus.textContent = `PIP Camera: Active (${getCameraLabel(deviceId)})`;
-            }
-        } catch (error) {
-            console.error(`Error starting ${type} camera:`, error);
-            alert(`Could not start ${type} camera: ${error.message}`);
-        }
-    }
-
-    // Stop camera function
-    function stopCamera(type) {
-        if (type === 'main' && mainStream) {
-            mainStream.getTracks().forEach(track => track.stop());
-            mainStream = null;
-            mainVideo.srcObject = null;
-            mainStatus.textContent = 'Main Camera: Not Active';
-
-            // Stop food detection if active
-            if (foodDetector && foodDetector.isDetecting) {
-                foodDetector.stopDetection();
-                foodDetectionBtn.classList.remove('active');
-                detectionStatus.textContent = 'Food Detection: Off';
-            }
+            <!-- Detection Info -->
+            <div id="detection-info" class="absolute top-16 left-3 bg-black bg-opacity-70 text-white p-3 rounded text-sm z-20 hidden">
+                Food Items Detected: <span id="food-count">0</span>
+            </div>
             
-            // Stop calorie estimation if active
-            if (calorieEstimator && calorieEstimator.isEstimating) {
-                calorieEstimator.stopEstimation();
-                if(calorieEstimationBtn) {
-                    calorieEstimationBtn.classList.remove('active');
-                    calorieEstimationBtn.innerHTML = "Start Calorie Estimation";
-                }
-                if(calorieStatus) {
-                    calorieStatus.textContent = 'Calorie Estimation: Off';
-                }
-            }
-        } else if (type === 'pip' && pipStream) {
-            pipStream.getTracks().forEach(track => track.stop());
-            pipStream = null;
-            pipVideo.srcObject = null;
-            pipStatus.textContent = 'PIP Camera: Not Active';
-        }
-    }
+            <!-- Main Camera Container -->
+            <div class="relative flex-grow min-h-0 mb-5" id="video-container">
+                <video id="main-video" class="w-full h-full object-contain bg-gray-800" autoplay muted playsinline></video>
+                <img id="main-image" class="w-full h-full object-contain bg-gray-800 hidden" alt="Uploaded image">
+                <canvas id="detection-overlay" class="absolute top-0 left-0 pointer-events-none z-10"></canvas>
+                
+                <!-- Status Overlay - Now positioned inside video container -->
+                <div id="status-overlay" class="top-3 left-3 bg-black bg-opacity-50 text-white p-3 rounded text-sm z-20 w-64">
+                    <div id="main-status" class="mb-1">Main Camera: Not Active</div>
+                    <div id="pip-status" class="mb-1">PIP Camera: Not Active</div>
+                    <div id="camera-label">Camera: Not Selected</div>
+                </div>
+                
+                <!-- PIP Overlay -->
+                <div id="pip-container" class="absolute bottom-5 right-5 z-30 w-48 h-36">
+                    <div class="absolute top-0 right-0 z-40 bg-black bg-opacity-70 p-1 rounded">
+                        <button id="pip-up" class="px-1 py-0.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded ml-1">↑</button>
+                        <button id="pip-down" class="px-1 py-0.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded ml-1">↓</button>
+                        <button id="pip-left" class="px-1 py-0.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded ml-1">←</button>
+                        <button id="pip-right" class="px-1 py-0.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded ml-1">→</button>
+                    </div>
+                    <video id="pip-video" class="w-full h-full object-cover bg-gray-800 rounded border-2 border-white" autoplay muted playsinline></video>
+                </div>
+            </div>
+            
+            <!-- Results Containers -->
+            <div id="detection-results" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>
+            <div id="video-processing-results" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>
+            
+            <!-- Calorie Estimation Results -->
+            <div id="calorie-estimation-results" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>
+            <div id="calorie-food-list" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>
+            
+            <!-- Status Display -->
+            <div id="status-display" class="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-2 rounded text-sm z-20 hidden"></div>
+            
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30 hidden">
+                <div class="text-white text-lg">Processing...</div>
+            </div>
+            
+            <!-- Error Display -->
+            <div id="error-display" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30 hidden">
+                <div class="bg-red-600 text-white p-4 rounded max-w-md">
+                    <h3 class="font-bold mb-2">Error</h3>
+                    <p id="error-message" class="text-sm"></p>
+                    <button id="error-close-btn" class="mt-3 bg-white text-red-600 px-3 py-1 rounded text-sm">Close</button>
+                </div>
+            </div>
+            
+            <!-- Success Display -->
+            <div id="success-display" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30 hidden">
+                <div class="bg-green-600 text-white p-4 rounded max-w-md">
+                    <h3 class="font-bold mb-2">Success</h3>
+                    <p id="success-message" class="text-sm"></p>
+                    <button id="success-close-btn" class="mt-3 bg-white text-green-600 px-3 py-1 rounded text-sm">Close</button>
+                </div>
+            </div>
+        </div>
+    </template>
 
-    // Toggle PIP visibility
-    function togglePipVisibility() {
-        pipVideo.classList.toggle('hidden');
-        togglePipBtn.textContent = pipVideo.classList.contains('hidden') ?
-            'Show PIP Camera' : 'Hide PIP Camera';
-    }
+    <!-- UI Overlay Elements -->
+    <div id="loading-overlay" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg max-w-sm w-full mx-4">
+            <div class="flex items-center justify-center">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-white mr-3"></div>
+                <span class="text-white">Loading...</span>
+            </div>
+        </div>
+    </div>
 
-    // Swap cameras between main and PIP
-    async function swapCameras() {
-        const mainDeviceId = mainCameraSelect.value;
-        const pipDeviceId = pipCameraSelect.value;
+    <!-- Progress Container -->
+    <div id="progress-container" class="hidden mb-4"></div>
+    
+    <!-- Video Progress Container -->
+    <div id="video-progress-container" class="hidden mb-4"></div>
 
-        if (!mainDeviceId || !pipDeviceId) {
-            alert('Please select both main and PIP cameras to swap');
-            return;
-        }
+    <div id="error-container" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+        <div class="bg-red-600 text-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 class="font-bold mb-2">Error</h3>
+            <p id="error-message" class="text-sm mb-4"></p>
+            <button id="error-close-btn" class="bg-white text-red-600 px-4 py-2 rounded">Close</button>
+        </div>
+    </div>
 
-        // Store current states
-        const mainActive = mainStream !== null;
-        const pipActive = pipStream !== null;
+    <div id="success-container" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+        <div class="bg-green-600 text-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 class="font-bold mb-2">Success</h3>
+            <p id="success-message" class="text-sm mb-4"></p>
+            <button id="success-close-btn" class="bg-white text-green-600 px-4 py-2 rounded">Close</button>
+        </div>
+    </div>
 
-        // Stop both cameras
-        if (mainActive) stopCamera('main');
-        if (pipActive) stopCamera('pip');
+    <!-- Templates for Dynamic Components -->
+    <template id="info-item">
+        <div class="bg-gray-700 rounded p-3 mb-3">
+            <div class="info-title font-semibold text-sm text-gray-300 mb-2"></div>
+            <div class="info-value text-sm text-gray-100"></div>
+        </div>
+    </template>
 
-        // Swap selections
-        const tempValue = mainCameraSelect.value;
-        mainCameraSelect.value = pipDeviceId;
-        pipCameraSelect.value = tempValue;
+    <template id="download-item">
+        <div class="bg-gray-700 rounded p-3 mb-3">
+            <a class="download-btn block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors" download="">
+                Download Processed Video
+            </a>
+        </div>
+    </template>
 
-        // Restart cameras with swapped devices
-        if (pipActive) await startCamera('main');
-        if (mainActive) await startCamera('pip');
-    }
+    <template id="detection-item">
+        <div class="bg-gray-700 rounded p-3 mb-2 flex justify-between items-center">
+            <div>
+                <div class="detection-name font-semibold"></div>
+                <div class="text-sm text-gray-400">
+                    Confidence: <span class="detection-confidence"></span> | 
+                    Calories: <span class="detection-calories"></span>
+                </div>
+            </div>
+            <button class="detection-details-btn bg-gray-600 hover:bg-gray-500 text-white text-xs px-2 py-1 rounded transition-colors">
+                Details
+            </button>
+        </div>
+    </template>
 
-    // Move PIP window
-    function movePip(direction) {
-        const pipContainer = document.querySelector('.pip-container');
-        const currentTop = parseInt(getComputedStyle(pipContainer).top) || 0;
-        const currentLeft = parseInt(getComputedStyle(pipContainer).left) || 0;
+    <template id="detection-modal">
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="modal-title text-xl font-bold"></h3>
+                    <button class="modal-close-btn text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+                <div class="modal-body"></div>
+            </div>
+        </div>
+    </template>
 
-        switch (direction) {
-            case 'up':
-                pipContainer.style.top = (currentTop - 10) + 'px';
-                break;
-            case 'down':
-                pipContainer.style.top = (currentTop + 10) + 'px';
-                break;
-            case 'left':
-                pipContainer.style.left = (currentLeft - 10) + 'px';
-                break;
-            case 'right':
-                pipContainer.style.left = (currentLeft + 10) + 'px';
-                break;
-        }
-    }
+    <template id="food-item-config">
+        <div class="bg-gray-700 rounded p-3 mb-2">
+            <div class="flex justify-between items-center mb-2">
+                <input type="text" class="food-name bg-gray-600 text-white px-2 py-1 rounded flex-grow mr-2" placeholder="Food name">
+                <button class="remove-food-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded transition-colors">
+                    Remove
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="text-xs text-gray-400">Calories (per 100g)</label>
+                    <input type="number" class="food-calories bg-gray-600 text-white px-2 py-1 rounded w-full" placeholder="0">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Weight (g)</label>
+                    <input type="number" class="food-weight bg-gray-600 text-white px-2 py-1 rounded w-full" placeholder="0">
+                </div>
+            </div>
+        </div>
+    </template>
 
-    // Helper function to get camera label
-    function getCameraLabel(deviceId) {
-        const camera = availableCameras.find(cam => cam.deviceId === deviceId);
-        return camera ? (camera.label || 'Unknown Camera') : 'Unknown Camera';
-    }
+    <!-- Include the external camera detection script -->
+<!--    <script src="camera_food_detection.js"></script>-->
 
-    // Initialize the app when the page loads
-    window.addEventListener('load', init);
-</script>
+    <!-- Include the calorie estimation script -->
+<!--    <script src="calorie_estimation.js"></script>-->
+
+    <!-- Main application script -->
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

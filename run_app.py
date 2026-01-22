@@ -10,7 +10,7 @@ def start_server():
     try:
         from food_detection_server import app
         print("Starting food detection server on http://localhost:5000")
-        app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+        app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
     except ImportError as e:
         print(f"Error importing server: {e}")
         print("Make sure to install dependencies with: pip install -r requirements.txt")
@@ -19,7 +19,7 @@ def start_server():
 def open_browser():
     """Open the browser after a delay to allow server to start"""
     time.sleep(3)  # Wait for server to start
-    webbrowser.open('http://localhost:5000')
+    webbrowser.open('http://localhost:5001')
 
 if __name__ == "__main__":
     print("Starting Camera AI Demo with Food Detection...")
