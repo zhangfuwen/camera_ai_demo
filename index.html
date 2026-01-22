@@ -13,6 +13,13 @@
             -webkit-transform: scaleX(-1); /* For older Safari versions */
             -moz-transform: scaleX(-1); /* For older Firefox versions */
         }
+        
+        /* Style for detection overlay canvas */
+        #detection-overlay {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1); /* For older Safari versions */
+            -moz-transform: scaleX(-1); /* For older Firefox versions */
+        }
     </style>
 </head>
 <body class="h-screen overflow-hidden bg-gray-900 text-white">
@@ -247,7 +254,7 @@
                 <canvas id="detection-overlay" class="absolute top-0 left-0 pointer-events-none z-10"></canvas>
                 
                 <!-- Status Overlay - Now positioned inside video container -->
-                <div id="status-overlay" class="top-3 left-3 bg-black bg-opacity-50 text-white p-3 rounded text-sm z-20 w-64">
+                <div id="status-overlay" class="absolute top-3 left-3 bg-black bg-opacity-50 text-white p-3 rounded text-sm z-20 w-64">
                     <div id="main-status" class="mb-1">Main Camera: Not Active</div>
                     <div id="pip-status" class="mb-1">PIP Camera: Not Active</div>
                     <div id="camera-label">Camera: Not Selected</div>

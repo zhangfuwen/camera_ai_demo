@@ -1,6 +1,6 @@
 /**
  * Food Detection Controller Component
- * Handles food detection from video and image files
+ * Handles food detection from video and image files using backend API
  */
 
 import { createComponent, showElement, hideElement, updateButton, updateStatus, createProgressBar, showNotification } from '../lib/componentUtils.js';
@@ -11,6 +11,11 @@ export class FoodDetectionController {
         this.currentVideoFile = null;
         this.detectionInProgress = false;
         this.progressBar = null;
+        this.isDetecting = false;
+        this.detectionInterval = null;
+        this.detectionOverlay = null;
+        this.lastDetectionResults = [];
+        this.ctx = null;
     }
 
     /**
@@ -20,6 +25,17 @@ export class FoodDetectionController {
         this.setupEventListeners();
         this.progressBar = createProgressBar('progress-container', 'detection-progress', 'progress-text');
         this.progressBar.hide();
+        
+        // Get UI elements for real-time detection
+        this.detectionButton = document.getElementById('food-detection-btn');
+        this.detectionStatus = document.getElementById('detection-status');
+        this.detectionOverlay = document.getElementById('detection-overlay');
+        this.mainVideo = document.getElementById('main-video');
+        
+        // Initialize canvas context
+        if (this.detectionOverlay) {
+            this.ctx = this.detectionOverlay.getContext('2d');
+        }
     }
 
     /**
@@ -27,7 +43,7 @@ export class FoodDetectionController {
      */
     setupEventListeners() {
         document.addEventListener("toggleFoodDetection", () => {
-            console.log("Food detection toggled");
+            this.toggleFoodDetection();
         });
 
         // Clear results button
@@ -35,6 +51,200 @@ export class FoodDetectionController {
         if (clearResultsBtn) {
             clearResultsBtn.addEventListener('click', () => this.clearResults());
         }
+    }
+
+    /**
+     * Toggle food detection on/off
+     */
+    toggleFoodDetection() {
+        if (this.isDetecting) {
+            this.stopFoodDetection();
+        } else {
+            this.startFoodDetection();
+        }
+    }
+
+    /**
+     * Start food detection
+     */
+    async startFoodDetection() {
+        if (!this.mainVideo || !this.mainVideo.srcObject) {
+            updateStatus('detection-status', 'Camera not active', 'error');
+            return;
+        }
+
+        this.isDetecting = true;
+        updateButton(this.detectionButton, 'Stop Food Detection', false);
+        updateStatus('detection-status', 'Food Detection: Active', 'success');
+
+        // Start detection interval
+        this.detectionInterval = setInterval(async () => {
+            await this.performDetection();
+        }, 2000); // Detect every 2 seconds
+
+        // Perform initial detection
+        await this.performDetection();
+    }
+
+    /**
+     * Stop food detection
+     */
+    stopFoodDetection() {
+        this.isDetecting = false;
+        
+        if (this.detectionInterval) {
+            clearInterval(this.detectionInterval);
+            this.detectionInterval = null;
+        }
+
+        updateButton(this.detectionButton, 'Start Food Detection', false);
+        updateStatus('detection-status', 'Food Detection: Off', 'info');
+        
+        // Clear detection overlay
+        this.clearDetectionOverlay();
+    }
+
+    /**
+     * Perform food detection by capturing current frame and sending to API
+     */
+    async performDetection() {
+        if (!this.mainVideo || !this.mainVideo.srcObject || !this.ctx) {
+            return;
+        }
+
+        try {
+            // Create a temporary canvas to capture the current frame
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = this.mainVideo.videoWidth;
+            tempCanvas.height = this.mainVideo.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw the current video frame to the temporary canvas
+            tempCtx.drawImage(this.mainVideo, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Convert to base64 (remove the data:image/jpeg;base64, prefix)
+            const imageData = tempCanvas.toDataURL('image/jpeg');
+            const base64Image = imageData.split(',')[1];
+            
+            // Send to backend API
+            const response = await fetch('/detect_food', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image: base64Image
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            // Check if result has the expected structure
+            if (result.success && result.detections) {
+                this.lastDetectionResults = result.detections;
+                this.drawDetections(this.lastDetectionResults);
+                this.displayDetections(result); // Display results in the UI
+                updateStatus('detection-status', `Detected ${this.lastDetectionResults.length} food items`, 'success');
+            } else {
+                throw new Error(result.error || 'Detection failed');
+            }
+        } catch (error) {
+            console.error('Error during food detection:', error);
+            updateStatus('detection-status', `Detection error: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Draw detection results on the overlay canvas
+     */
+    drawDetections(detections) {
+        if (!this.ctx || !this.detectionOverlay || !this.mainVideo) {
+            return;
+        }
+
+        // Get the actual display size of the video element
+        const videoRect = this.mainVideo.getBoundingClientRect();
+        const videoDisplayWidth = videoRect.width;
+        const videoDisplayHeight = videoRect.height;
+
+        // Set canvas size to match video display size
+        this.detectionOverlay.style.width = `${videoDisplayWidth}px`;
+        this.detectionOverlay.style.height = `${videoDisplayHeight}px`;
+        this.detectionOverlay.width = videoDisplayWidth;
+        this.detectionOverlay.height = videoDisplayHeight;
+
+        // Clear previous drawings
+        this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
+
+        // Calculate scale factors from video resolution to display size
+        const scaleX = videoDisplayWidth / this.mainVideo.videoWidth;
+        const scaleY = videoDisplayHeight / this.mainVideo.videoHeight;
+
+        // Update detection info
+        const detectionInfo = document.getElementById('detection-info');
+        const foodCount = document.getElementById('food-count');
+        
+        if (detections.length > 0) {
+            if (detectionInfo) {
+                detectionInfo.classList.remove('hidden');
+            }
+            if (foodCount) {
+                foodCount.textContent = detections.length;
+            }
+        } else {
+            if (detectionInfo) {
+                detectionInfo.classList.add('hidden');
+            }
+        }
+
+        // Draw each detection
+        detections.forEach(detection => {
+            const { label, score, box } = detection;
+            
+            // Scale bounding box coordinates to match display size
+            const scaledX1 = box.xmin * scaleX;
+            const scaledY1 = box.ymin * scaleY;
+            const scaledWidth = (box.xmax - box.xmin) * scaleX;
+            const scaledHeight = (box.ymax - box.ymin) * scaleY;
+            
+            // Draw bounding box
+            this.ctx.strokeStyle = '#00FF00';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(scaledX1, scaledY1, scaledWidth, scaledHeight);
+            
+            // Draw label background
+            const text = `${label} (${Math.round(score * 100)}%)`;
+            this.ctx.font = '16px Arial';
+            const textWidth = this.ctx.measureText(text).width;
+            this.ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+            this.ctx.fillRect(scaledX1, scaledY1 - 20, textWidth + 4, 20);
+            
+            // Draw label text
+            this.ctx.fillStyle = '#000000';
+            this.ctx.fillText(text, scaledX1 + 2, scaledY1 - 5);
+        });
+    }
+
+    /**
+     * Clear the detection overlay
+     */
+    clearDetectionOverlay() {
+        if (this.ctx && this.detectionOverlay) {
+            this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
+        }
+        
+        // Hide detection info
+        const detectionInfo = document.getElementById('detection-info');
+        if (detectionInfo) {
+            detectionInfo.classList.add('hidden');
+        }
+        
+        // Reset last detection results
+        this.lastDetectionResults = [];
     }
 
 
@@ -77,8 +287,8 @@ export class FoodDetectionController {
             const confidenceElement = item.querySelector('.detection-confidence');
             const caloriesElement = item.querySelector('.detection-calories');
             
-            if (nameElement) nameElement.textContent = detection.name || 'Unknown';
-            if (confidenceElement) confidenceElement.textContent = `${Math.round((detection.confidence || 0) * 100)}%`;
+            if (nameElement) nameElement.textContent = detection.label || 'Unknown';
+            if (confidenceElement) confidenceElement.textContent = `${Math.round((detection.score || 0) * 100)}%`;
             if (caloriesElement) caloriesElement.textContent = detection.calories || 'N/A';
             
             // Add click event to show details
@@ -116,24 +326,26 @@ export class FoodDetectionController {
         const modalTitle = modal.querySelector('.modal-title');
         const modalBody = modal.querySelector('.modal-body');
         
-        if (modalTitle) modalTitle.textContent = detection.name || 'Unknown Food';
+        if (modalTitle) modalTitle.textContent = detection.label || 'Unknown Food';
         
         if (modalBody) {
             modalBody.innerHTML = `
                 <div class="space-y-4">
                     <div>
                         <h4 class="font-semibold text-sm text-gray-400">Confidence</h4>
-                        <p>${Math.round((detection.confidence || 0) * 100)}%</p>
-                    </div>
-                    <div>
-                        <h4 class="font-semibold text-sm text-gray-400">Estimated Calories</h4>
-                        <p>${detection.calories || 'N/A'}</p>
+                        <p>${Math.round((detection.score || 0) * 100)}%</p>
                     </div>
                     <div>
                         <h4 class="font-semibold text-sm text-gray-400">Bounding Box</h4>
-                        <p>X: ${detection.bbox?.x || 'N/A'}, Y: ${detection.bbox?.y || 'N/A'}</p>
-                        <p>Width: ${detection.bbox?.width || 'N/A'}, Height: ${detection.bbox?.height || 'N/A'}</p>
+                        <p>XMin: ${detection.box?.xmin || 'N/A'}, YMin: ${detection.box?.ymin || 'N/A'}</p>
+                        <p>XMax: ${detection.box?.xmax || 'N/A'}, YMax: ${detection.box?.ymax || 'N/A'}</p>
                     </div>
+                    ${detection.mask ? `
+                    <div>
+                        <h4 class="font-semibold text-sm text-gray-400">Segmentation Mask</h4>
+                        <p>Available (${detection.mask.length} rows)</p>
+                    </div>
+                    ` : ''}
                 </div>
             `;
         }

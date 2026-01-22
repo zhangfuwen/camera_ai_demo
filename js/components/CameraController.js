@@ -103,6 +103,12 @@ export class CameraController {
                 this.stream = stream;
                 this.videoElement.srcObject = stream;
                 updateStatus('main-status', 'Main Camera: Active');
+                
+                // Enable food detection button when main camera is active
+                const foodDetectionBtn = document.getElementById('food-detection-btn');
+                if (foodDetectionBtn) {
+                    foodDetectionBtn.disabled = false;
+                }
             } else {
                 this.pipStream = stream;
                 if (!this.pipVideo) {
@@ -137,6 +143,17 @@ export class CameraController {
             this.videoElement.srcObject = null;
             
             updateStatus('main-status', 'Main Camera: Not Active');
+            
+            // Disable food detection button when main camera is stopped
+            const foodDetectionBtn = document.getElementById('food-detection-btn');
+            if (foodDetectionBtn) {
+                foodDetectionBtn.disabled = true;
+            }
+            
+            // Stop food detection if it's running
+            if (window.app && window.app.foodDetectionController && window.app.foodDetectionController.isDetecting) {
+                window.app.foodDetectionController.stopFoodDetection();
+            }
         } else if (type === 'pip' && this.pipStream) {
             this.pipStream.getTracks().forEach(track => track.stop());
             this.pipStream = null;
