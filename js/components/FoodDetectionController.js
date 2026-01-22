@@ -127,7 +127,7 @@ export class FoodDetectionController {
             const base64Image = imageData.split(',')[1];
             
             // Send to backend API
-            const response = await fetch('http://localhost:5001/detect_food', {
+            const response = await fetch('/detect_food', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -204,6 +204,9 @@ export class FoodDetectionController {
         // Draw each detection
         detections.forEach(detection => {
             const { label, score, box, mask } = detection;
+            if (label == 'person') {
+                return;
+            }
             
             // Scale bounding box coordinates to match display size
             const scaledX1 = box.xmin * scaleX;
@@ -217,30 +220,24 @@ export class FoodDetectionController {
                 const maskCanvas = document.createElement('canvas');
                 const maskCtx = maskCanvas.getContext('2d');
                 
-                // Set mask canvas size to match the scaled bounding box
-                maskCanvas.width = Math.round(scaledWidth);
-                maskCanvas.height = Math.round(scaledHeight);
+                // Calculate mask dimensions
+                const maskHeight = mask.length;
+                const maskWidth = mask[0].length;
+                
+                // Set mask canvas size to match the original mask dimensions
+                maskCanvas.width = maskWidth;
+                maskCanvas.height = maskHeight;
                 
                 // Create image data from mask array
                 const maskImageData = maskCtx.createImageData(maskCanvas.width, maskCanvas.height);
                 const maskData = maskImageData.data;
                 
-                // Calculate mask dimensions
-                const maskHeight = mask.length;
-                const maskWidth = mask[0].length;
-                
-                // Scale mask to fit the bounding box
-                for (let y = 0; y < maskCanvas.height; y++) {
-                    for (let x = 0; x < maskCanvas.width; x++) {
-                        // Map canvas coordinates to mask coordinates
-                        const maskY = Math.floor((y / maskCanvas.height) * maskHeight);
-                        const maskX = Math.floor((x / maskCanvas.width) * maskWidth);
+                // Fill the mask data
+                for (let y = 0; y < maskHeight; y++) {
+                    for (let x = 0; x < maskWidth; x++) {
+                        const maskValue = mask[y] && mask[y][x] ? mask[y][x] : 0;
+                        const pixelIndex = (y * maskWidth + x) * 4;
                         
-                        // Get mask value (0 or 1)
-                        const maskValue = mask[maskY] && mask[maskY][maskX] ? mask[maskY][maskX] : 0;
-                        
-                        // Set pixel color with transparency
-                        const pixelIndex = (y * maskCanvas.width + x) * 4;
                         if (maskValue > 0) {
                             // Semi-transparent green for mask
                             maskData[pixelIndex] = 0;     // R
@@ -260,8 +257,29 @@ export class FoodDetectionController {
                 // Put the mask image data on the mask canvas
                 maskCtx.putImageData(maskImageData, 0, 0);
                 
-                // Draw the mask on the main canvas
-                this.ctx.drawImage(maskCanvas, scaledX1, scaledY1);
+                // Calculate the aspect ratio of the mask
+                const maskAspectRatio = maskWidth / maskHeight;
+                const boundingBoxAspectRatio = scaledWidth / scaledHeight;
+                
+                // Calculate the dimensions and position to maintain aspect ratio
+                let drawWidth, drawHeight, drawX, drawY;
+                
+                if (maskAspectRatio > boundingBoxAspectRatio) {
+                    // Mask is wider than the bounding box, fit to width
+                    drawWidth = scaledWidth;
+                    drawHeight = scaledWidth / maskAspectRatio;
+                    drawX = scaledX1;
+                    drawY = scaledY1 + (scaledHeight - drawHeight) / 2;
+                } else {
+                    // Mask is taller than the bounding box, fit to height
+                    drawHeight = scaledHeight;
+                    drawWidth = scaledHeight * maskAspectRatio;
+                    drawX = scaledX1 + (scaledWidth - drawWidth) / 2;
+                    drawY = scaledY1;
+                }
+                
+                // Draw the mask on the main canvas with proper aspect ratio
+                this.ctx.drawImage(maskCanvas, drawX, drawY, drawWidth, drawHeight);
             }
             
             // Draw bounding box
