@@ -223,9 +223,18 @@ export class FoodDetectionController {
             this.ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
             this.ctx.fillRect(scaledX1, scaledY1 - 20, textWidth + 4, 20);
             
-            // Draw label text
+            // Save the current context state
+            this.ctx.save();
+            
+            // Flip the context horizontally for text
+            this.ctx.scale(-1, 1);
+            
+            // Draw label text (flipped position to account for the scale transformation)
             this.ctx.fillStyle = '#000000';
-            this.ctx.fillText(text, scaledX1 + 2, scaledY1 - 5);
+            this.ctx.fillText(text, -(scaledX1 + 2), scaledY1 - 5);
+            
+            // Restore the context state
+            this.ctx.restore();
         });
     }
 
