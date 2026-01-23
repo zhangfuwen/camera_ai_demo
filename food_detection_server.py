@@ -79,9 +79,12 @@ def detect_food():
         image_data = base64.b64decode(data['image'])
         nparr = np.frombuffer(image_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+      #  img = img.transpose(1, 0, 2)
         
         if img is None:
             return jsonify({"success": False, "error": "Could not decode image"}), 400
+
+        print("Image shape:", img.shape)
         
         # Perform segmentation with YOLO
         results = model(img, conf=0.1)  # Confidence threshold of 0.5

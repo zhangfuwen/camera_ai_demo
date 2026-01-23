@@ -118,9 +118,11 @@ export class FoodDetectionController {
             tempCanvas.width = this.mainVideo.videoWidth;
             tempCanvas.height = this.mainVideo.videoHeight;
             const tempCtx = tempCanvas.getContext('2d');
-            
+
             // Draw the current video frame to the temporary canvas
             tempCtx.drawImage(this.mainVideo, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            console.log("canvas width:", tempCanvas.width, "canvas height:", tempCanvas.height);
 
             // Convert to base64 (remove the data:image/jpeg;base64, prefix)
             const imageData = tempCanvas.toDataURL('image/jpeg');

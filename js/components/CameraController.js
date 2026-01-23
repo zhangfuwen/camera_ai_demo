@@ -54,7 +54,7 @@ export class CameraController {
     }
 
     /**
-     * Get available camera devices
+     * Get available camera devices and their capabilities
      */
     async getCameraDevices() {
         try {
@@ -63,11 +63,130 @@ export class CameraController {
             
             if (this.devices.length > 0) {
                 this.currentDeviceId = this.devices[0].deviceId;
+                
+                // Get capabilities for the first camera
+                await this.getCameraCapabilities(this.devices[0].deviceId);
             }
+            
+            // Reset resolution selector when camera devices are loaded
+            const resolutionSelect = document.getElementById('resolution-select');
+            if (resolutionSelect) {
+                resolutionSelect.value = '';
+                resolutionSelect.disabled = this.devices.length === 0;
+            }
+            
+            updateStatus('main-status', `Found ${this.devices.length} camera(s)`);
         } catch (error) {
             console.error('Error getting camera devices:', error);
             updateStatus('main-status', 'Error: Could not access camera devices');
         }
+    }
+
+    /**
+     * Get camera capabilities including supported resolutions
+     * @param {string} deviceId - Camera device ID
+     */
+    async getCameraCapabilities(deviceId) {
+        try {
+            // Get a temporary stream to check capabilities
+            const tempStream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: deviceId } }
+            });
+            
+            const videoTrack = tempStream.getVideoTracks()[0];
+            const capabilities = videoTrack.getCapabilities();
+            
+            console.log('Camera capabilities:', capabilities);
+            
+            // Check if width and height ranges are available
+            if (capabilities.width && capabilities.height) {
+                console.log(`Supported resolution range: ${capabilities.width.min}x${capabilities.height.min} to ${capabilities.width.max}x${capabilities.height.max}`);
+                console.log(`Resolution step: ${capabilities.width.step}x${capabilities.height.step}`);
+                
+                // Generate common resolutions within the supported range
+                const commonResolutions = [
+                    { width: 640, height: 480 },   // VGA
+                    { width: 1280, height: 720 },  // 720p HD
+                    { width: 1920, height: 1080 }, // 1080p Full HD
+                    { width: 3840, height: 2160 }  // 4K UHD
+                ];
+                
+                const supportedResolutions = commonResolutions.filter(res => 
+                    res.width >= capabilities.width.min && 
+                    res.width <= capabilities.width.max &&
+                    res.height >= capabilities.height.min && 
+                    res.height <= capabilities.height.max
+                );
+
+                console.log("capabilities:", capabilities);
+                
+                console.log('Supported common resolutions:', supportedResolutions);
+                
+                // Store supported resolutions for later use
+                this.supportedResolutions = supportedResolutions;
+                
+                // Update UI with resolution options
+                this.updateResolutionOptions(supportedResolutions);
+            }
+            
+            // Stop the temporary stream
+            tempStream.getTracks().forEach(track => track.stop());
+        } catch (error) {
+            console.error('Error getting camera capabilities:', error);
+        }
+    }
+
+    /**
+     * Update the UI with resolution options
+     * @param {Array} resolutions - Array of supported resolutions
+     */
+    updateResolutionOptions(resolutions) {
+        const resolutionSelect = document.getElementById('resolution-select');
+        if (!resolutionSelect) return;
+        
+        // Clear existing options
+        resolutionSelect.innerHTML = '<option value="">-- Default resolution --</option>';
+        
+        // Add supported resolutions
+        resolutions.forEach(res => {
+            const option = document.createElement('option');
+            option.value = `${res.width}x${res.height}`;
+            option.textContent = `${res.width}x${res.height} (${this.getResolutionName(res.width, res.height)})`;
+            resolutionSelect.appendChild(option);
+        });
+        
+        // Enable the selector
+        resolutionSelect.disabled = false;
+        
+        // Log available options
+        console.log('Available resolution options:');
+        resolutions.forEach((res, index) => {
+            console.log(`${index + 1}. ${res.width}x${res.height}`);
+        });
+    }
+
+    /**
+     * Get a user-friendly name for a resolution
+     * @param {number} width - Resolution width
+     * @param {number} height - Resolution height
+     * @returns {string} - Resolution name
+     */
+    getResolutionName(width, height) {
+        if (width === 640 && height === 480) return 'VGA';
+        if (width === 1280 && height === 720) return '720p HD';
+        if (width === 1920 && height === 1080) return '1080p Full HD';
+        if (width === 3840 && height === 2160) return '4K UHD';
+        return 'Custom';
+    }
+
+    /**
+     * Set camera resolution
+     * @param {number} width - Desired width
+     * @param {number} height - Desired height
+     */
+    setCameraResolution(width, height) {
+        this.desiredResolution = { width, height };
+        console.log(`Camera resolution set to: ${width}x${height}`);
     }
 
     /**
@@ -92,17 +211,30 @@ export class CameraController {
                 this.pipStream.getTracks().forEach(track => track.stop());
             }
 
+            // Set up constraints with desired resolution if available
             const constraints = {
-                video: { deviceId: { exact: deviceId } }
+                video: { 
+                    deviceId: { exact: deviceId },
+                    ...(this.desiredResolution && {
+                        width: { ideal: this.desiredResolution.width },
+                        height: { ideal: this.desiredResolution.height }
+                    })
+                }
             };
 
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // Get video track to check resolution
+            const videoTrack = stream.getVideoTracks()[0];
+            const settings = videoTrack.getSettings();
+            console.log(`Camera resolution: ${settings.width}x${settings.height}`);
+            console.log(stream.getVideoTracks().length)
             
             // Assign stream to the appropriate video element
             if (type === 'main') {
                 this.stream = stream;
                 this.videoElement.srcObject = stream;
-                updateStatus('main-status', 'Main Camera: Active');
+                updateStatus('main-status', `Main Camera: Active (${settings.width}x${settings.height})`);
                 
                 // Enable food detection button when main camera is active
                 const foodDetectionBtn = document.getElementById('food-detection-btn');
@@ -115,7 +247,7 @@ export class CameraController {
                     this.pipVideo = document.getElementById('pip-video');
                 }
                 this.pipVideo.srcObject = stream;
-                updateStatus('pip-status', 'PIP Camera: Active');
+                updateStatus('pip-status', `PIP Camera: Active (${settings.width}x${settings.height})`);
             }
             
             // Update toggle button state and text
@@ -439,6 +571,23 @@ export class CameraController {
         document.addEventListener('togglePipVisibility', () => this.togglePipVisibility());
         document.addEventListener('swapCameras', () => this.swapCameras());
         document.addEventListener('movePip', (e) => this.movePip(e.detail.direction));
+        
+        // Main camera select
+        const mainSelect = document.getElementById('main-camera-select');
+        if (mainSelect) {
+            mainSelect.addEventListener('change', async (e) => {
+                if (e.target.value) {
+                    // Get capabilities for the selected camera
+                    await this.getCameraCapabilities(e.target.value);
+                    // Reset resolution selector when camera is changed
+                    const resolutionSelect = document.getElementById('resolution-select');
+                    if (resolutionSelect) {
+                        resolutionSelect.value = '';
+                        this.setCameraResolution(null, null);
+                    }
+                }
+            });
+        }
         // Camera toggle button
         const cameraBtn = document.getElementById('toggle-camera-btn');
         if (cameraBtn) {
@@ -467,6 +616,22 @@ export class CameraController {
         const pipBtn = document.getElementById('toggle-pip-btn');
         if (pipBtn) {
             pipBtn.addEventListener('click', () => this.togglePipVisibility());
+        }
+        
+        // Resolution selector
+        const resolutionSelect = document.getElementById('resolution-select');
+        if (resolutionSelect) {
+            resolutionSelect.addEventListener('change', (e) => {
+                const value = e.target.value;
+                if (value) {
+                    const [width, height] = value.split('x').map(Number);
+                    this.setCameraResolution(width, height);
+                    updateStatus('main-status', `Resolution set to ${width}x${height}`);
+                } else {
+                    this.setCameraResolution(null, null);
+                    updateStatus('main-status', 'Resolution reset to default');
+                }
+            });
         }
     }
 
