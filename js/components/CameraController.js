@@ -234,6 +234,25 @@ export class CameraController {
             if (type === 'main') {
                 this.stream = stream;
                 this.videoElement.srcObject = stream;
+                
+                // Set video element dimensions to match the actual camera resolution
+                this.videoElement.width = settings.width;
+                this.videoElement.height = settings.height;
+                
+                // Also update the detection overlay canvas to match
+                const detectionOverlay = document.getElementById('detection-overlay');
+                if (detectionOverlay) {
+                    detectionOverlay.width = settings.width;
+                    detectionOverlay.height = settings.height;
+                }
+                
+                // Update the main image element to match as well
+                const mainImage = document.getElementById('main-image');
+                if (mainImage) {
+                    mainImage.width = settings.width;
+                    mainImage.height = settings.height;
+                }
+                
                 updateStatus('main-status', `Main Camera: Active (${settings.width}x${settings.height})`);
                 
                 // Enable food detection button when main camera is active
@@ -247,6 +266,11 @@ export class CameraController {
                     this.pipVideo = document.getElementById('pip-video');
                 }
                 this.pipVideo.srcObject = stream;
+                
+                // Set PIP video element dimensions to match the actual camera resolution
+                this.pipVideo.width = settings.width;
+                this.pipVideo.height = settings.height;
+                
                 updateStatus('pip-status', `PIP Camera: Active (${settings.width}x${settings.height})`);
             }
             

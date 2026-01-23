@@ -68,8 +68,13 @@ export class FoodDetectionController {
      * Start food detection
      */
     async startFoodDetection() {
-        if (!this.mainVideo || !this.mainVideo.srcObject) {
-            updateStatus('detection-status', 'Camera not active', 'error');
+        // Check if we have either a video stream or an image
+        const hasVideoStream = this.mainVideo && this.mainVideo.srcObject;
+        const hasImage = document.getElementById('main-image') && 
+                         !document.getElementById('main-image').classList.contains('hidden');
+        
+        if (!hasVideoStream && !hasImage) {
+            updateStatus('detection-status', 'No video or image source available', 'error');
             return;
         }
 
@@ -77,13 +82,20 @@ export class FoodDetectionController {
         updateButton(this.detectionButton, 'Stop Food Detection', false);
         updateStatus('detection-status', 'Food Detection: Active', 'success');
 
-        // Start detection interval
-        this.detectionInterval = setInterval(async () => {
+        // For images, perform detection only once
+        if (hasImage) {
             await this.performDetection();
-        }, 2000); // Detect every 2 seconds
+            // Stop detection after one run for images
+            this.stopFoodDetection();
+        } else {
+            // For video, start detection interval
+            this.detectionInterval = setInterval(async () => {
+                await this.performDetection();
+            }, 2000); // Detect every 2 seconds
 
-        // Perform initial detection
-        await this.performDetection();
+            // Perform initial detection
+            await this.performDetection();
+        }
     }
 
     /**
@@ -108,21 +120,42 @@ export class FoodDetectionController {
      * Perform food detection by capturing current frame and sending to API
      */
     async performDetection() {
-        if (!this.mainVideo || !this.mainVideo.srcObject || !this.ctx) {
+        // Check if we have either a video stream or an image
+        const hasVideoStream = this.mainVideo && this.mainVideo.srcObject;
+        const hasImage = document.getElementById('main-image') && 
+                         !document.getElementById('main-image').classList.contains('hidden');
+        
+        if (!hasVideoStream && !hasImage) {
+            console.error('No video stream or image available for detection');
             return;
         }
 
         try {
             // Create a temporary canvas to capture the current frame
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = this.mainVideo.videoWidth;
-            tempCanvas.height = this.mainVideo.videoHeight;
+            let sourceElement, sourceWidth, sourceHeight;
+            
+            if (hasImage) {
+                // Use the image element as source
+                sourceElement = document.getElementById('main-image');
+                sourceWidth = sourceElement.naturalWidth || sourceElement.width;
+                sourceHeight = sourceElement.naturalHeight || sourceElement.height;
+            } else {
+                // Use the video element as source
+                sourceElement = this.mainVideo;
+                sourceWidth = sourceElement.videoWidth || sourceElement.width;
+                sourceHeight = sourceElement.videoHeight || sourceElement.height;
+            }
+            
+            tempCanvas.width = sourceWidth;
+            tempCanvas.height = sourceHeight;
             const tempCtx = tempCanvas.getContext('2d');
 
-            // Draw the current video frame to the temporary canvas
-            tempCtx.drawImage(this.mainVideo, 0, 0, tempCanvas.width, tempCanvas.height);
+            // Draw the current frame to the temporary canvas
+            tempCtx.drawImage(sourceElement, 0, 0, tempCanvas.width, tempCanvas.height);
 
-            console.log("canvas width:", tempCanvas.width, "canvas height:", tempCanvas.height);
+            console.log("Source resolution:", sourceWidth, "x", sourceHeight);
+            console.log("Canvas resolution:", tempCanvas.width, "x", tempCanvas.height);
 
             // Convert to base64 (remove the data:image/jpeg;base64, prefix)
             const imageData = tempCanvas.toDataURL('image/jpeg');
@@ -164,27 +197,43 @@ export class FoodDetectionController {
      * Draw detection results on the overlay canvas
      */
     drawDetections(detections) {
-        if (!this.ctx || !this.detectionOverlay || !this.mainVideo) {
+        if (!this.ctx || !this.detectionOverlay) {
             return;
         }
 
-        // Get the actual display size of the video element
-        const videoRect = this.mainVideo.getBoundingClientRect();
-        const videoDisplayWidth = videoRect.width;
-        const videoDisplayHeight = videoRect.height;
-
-        // Set canvas size to match video display size
-        this.detectionOverlay.style.width = `${videoDisplayWidth}px`;
-        this.detectionOverlay.style.height = `${videoDisplayHeight}px`;
-        this.detectionOverlay.width = videoDisplayWidth;
-        this.detectionOverlay.height = videoDisplayHeight;
+        // Check if we have either a video stream or an image
+        const hasVideoStream = this.mainVideo && this.mainVideo.srcObject;
+        const hasImage = document.getElementById('main-image') && 
+                         !document.getElementById('main-image').classList.contains('hidden');
+        
+        let sourceElement, sourceWidth, sourceHeight;
+        
+        if (hasImage) {
+            // Use the image element as source
+            sourceElement = document.getElementById('main-image');
+            sourceWidth = sourceElement.naturalWidth || sourceElement.width;
+            sourceHeight = sourceElement.naturalHeight || sourceElement.height;
+        } else if (hasVideoStream) {
+            // Use the video element as source
+            sourceElement = this.mainVideo;
+            sourceWidth = sourceElement.videoWidth || sourceElement.width;
+            sourceHeight = sourceElement.videoHeight || sourceElement.height;
+        } else {
+            console.error('No video stream or image available for drawing detections');
+            return;
+        }
+        
+        // Set canvas size to match source resolution
+        this.detectionOverlay.width = sourceWidth;
+        this.detectionOverlay.height = sourceHeight;
+        
+        // Set canvas display size to match the source element's display size
+        const sourceRect = sourceElement.getBoundingClientRect();
+        this.detectionOverlay.style.width = `${sourceRect.width}px`;
+        this.detectionOverlay.style.height = `${sourceRect.height}px`;
 
         // Clear previous drawings
         this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
-
-        // Calculate scale factors from video resolution to display size
-        const scaleX = videoDisplayWidth / this.mainVideo.videoWidth;
-        const scaleY = videoDisplayHeight / this.mainVideo.videoHeight;
 
         // Update detection info
         const detectionInfo = document.getElementById('detection-info');
@@ -210,11 +259,11 @@ export class FoodDetectionController {
                 return;
             }
             
-            // Scale bounding box coordinates to match display size
-            const scaledX1 = box.xmin * scaleX;
-            const scaledY1 = box.ymin * scaleY;
-            const scaledWidth = (box.xmax - box.xmin) * scaleX;
-            const scaledHeight = (box.ymax - box.ymin) * scaleY;
+            // Use the original box coordinates (they're already in source resolution space)
+            const x1 = box.xmin;
+            const y1 = box.ymin;
+            const width = box.xmax - box.xmin;
+            const height = box.ymax - box.ymin;
             
             // Draw segmentation mask if available
             if (mask && mask.length > 0) {
@@ -261,23 +310,23 @@ export class FoodDetectionController {
                 
                 // Calculate the aspect ratio of the mask
                 const maskAspectRatio = maskWidth / maskHeight;
-                const boundingBoxAspectRatio = scaledWidth / scaledHeight;
+                const boundingBoxAspectRatio = width / height;
                 
                 // Calculate the dimensions and position to maintain aspect ratio
                 let drawWidth, drawHeight, drawX, drawY;
                 
                 if (maskAspectRatio > boundingBoxAspectRatio) {
                     // Mask is wider than the bounding box, fit to width
-                    drawWidth = scaledWidth;
-                    drawHeight = scaledWidth / maskAspectRatio;
-                    drawX = scaledX1;
-                    drawY = scaledY1 + (scaledHeight - drawHeight) / 2;
+                    drawWidth = width;
+                    drawHeight = width / maskAspectRatio;
+                    drawX = x1;
+                    drawY = y1 + (height - drawHeight) / 2;
                 } else {
                     // Mask is taller than the bounding box, fit to height
-                    drawHeight = scaledHeight;
-                    drawWidth = scaledHeight * maskAspectRatio;
-                    drawX = scaledX1 + (scaledWidth - drawWidth) / 2;
-                    drawY = scaledY1;
+                    drawHeight = height;
+                    drawWidth = height * maskAspectRatio;
+                    drawX = x1 + (width - drawWidth) / 2;
+                    drawY = y1;
                 }
                 
                 // Draw the mask on the main canvas with proper aspect ratio
@@ -287,14 +336,14 @@ export class FoodDetectionController {
             // Draw bounding box
             this.ctx.strokeStyle = '#00FF00';
             this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(scaledX1, scaledY1, scaledWidth, scaledHeight);
+            this.ctx.strokeRect(x1, y1, width, height);
             
             // Draw label background
             const text = `${label} (${Math.round(score * 100)}%)`;
             this.ctx.font = '16px Arial';
             const textWidth = this.ctx.measureText(text).width;
             this.ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
-            this.ctx.fillRect(scaledX1, scaledY1 - 20, textWidth + 4, 20);
+            this.ctx.fillRect(x1, y1 - 20, textWidth + 4, 20);
             
             // Save the current context state
             this.ctx.save();
@@ -304,7 +353,7 @@ export class FoodDetectionController {
             
             // Draw label text (flipped position to account for the scale transformation)
             this.ctx.fillStyle = '#000000';
-            this.ctx.fillText(text, -(scaledX1 + 2), scaledY1 - 5);
+            this.ctx.fillText(text, -(x1 + 2), y1 - 5);
             
             // Restore the context state
             this.ctx.restore();

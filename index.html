@@ -185,6 +185,12 @@
                             <div id="video-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
                             <button id="clear-remembered-file" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden">Clear Remembered File</button>
                         </div>
+                        <div class="mb-4">
+                            <label for="image-file-input" class="block mb-2 font-bold text-gray-300">Select Local Image:</label>
+                            <input type="file" id="image-file-input" accept="image/*" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white">
+                            <div id="image-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
+                            <button id="clear-image-btn" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden">Clear Image</button>
+                        </div>
                         <button id="configure-llm-btn" class="w-full p-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded transition-colors">Configure LLM</button>
                         <button id="parse-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors" disabled>LLM Video Test</button>
                         <div id="video-processing-progress" class="mt-3 hidden">

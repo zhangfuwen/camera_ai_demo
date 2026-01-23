@@ -9,6 +9,7 @@ import { CameraController } from './components/CameraController.js';
 import { FoodDetectionController } from './components/FoodDetectionController.js';
 import { CalorieEstimationController } from './components/CalorieEstimationController.js';
 import { VideoProcessingController } from './components/VideoProcessingController.js';
+import { ImageProcessingController } from './components/ImageProcessingController.js';
 import { UIController } from './components/UIController.js';
 import { LLMClient } from './components/LLMClient.js';
 
@@ -18,6 +19,7 @@ window.app = {
     foodDetectionController: null,
     calorieEstimationController: null,
     videoProcessingController: null,
+    imageProcessingController: null,
     uiController: null,
     llmClient: null,
     isInitialized: false
@@ -43,6 +45,7 @@ async function init() {
         app.foodDetectionController = new FoodDetectionController();
         app.calorieEstimationController = new CalorieEstimationController();
         app.videoProcessingController = new VideoProcessingController();
+        app.imageProcessingController = new ImageProcessingController();
         app.llmClient = new LLMClient();
         
         // Initialize components
@@ -85,6 +88,9 @@ async function initializeComponents() {
 
     // Initialize video processing controller
     app.videoProcessingController.initialize();
+    
+    // Initialize image processing controller
+    app.imageProcessingController.initialize();
     
     // Initialize LLM client
     app.llmClient.initialize();
@@ -246,6 +252,12 @@ function setupEventDelegation() {
     document.addEventListener('change', (event) => {
         if (event.target.matches('#video-file-input')) {
             document.dispatchEvent(new CustomEvent('videoFileSelected', { 
+                detail: { file: event.target.files[0] } 
+            }));
+        }
+        
+        if (event.target.matches('#image-file-input')) {
+            document.dispatchEvent(new CustomEvent('imageFileSelected', { 
                 detail: { file: event.target.files[0] } 
             }));
         }
