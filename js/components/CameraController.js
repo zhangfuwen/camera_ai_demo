@@ -260,6 +260,17 @@ export class CameraController {
                 if (foodDetectionBtn) {
                     foodDetectionBtn.disabled = false;
                 }
+                
+                // Enable mosaic effect button when main camera is active
+                const mosaicBtn = document.getElementById('toggle-mosaic-btn');
+                if (mosaicBtn) {
+                    mosaicBtn.disabled = false;
+                }
+                
+                // Initialize mosaic effect controller if not already done
+                if (window.app && window.app.mosaicEffectController && !window.app.mosaicEffectController.videoElement) {
+                    window.app.mosaicEffectController.initialize(this.videoElement);
+                }
             } else {
                 this.pipStream = stream;
                 if (!this.pipVideo) {
@@ -304,6 +315,32 @@ export class CameraController {
             const foodDetectionBtn = document.getElementById('food-detection-btn');
             if (foodDetectionBtn) {
                 foodDetectionBtn.disabled = true;
+            }
+            
+            // Disable mosaic effect button when main camera is stopped
+            const mosaicBtn = document.getElementById('toggle-mosaic-btn');
+            if (mosaicBtn) {
+                mosaicBtn.disabled = true;
+            }
+            
+            // Stop mosaic effect if it's running
+            if (window.app && window.app.mosaicEffectController && window.app.mosaicEffectController.isEnabled) {
+                window.app.mosaicEffectController.stopProcessing();
+                window.app.mosaicEffectController.isEnabled = false;
+                
+                // Reset button state
+                const toggleBtn = document.getElementById('toggle-mosaic-btn');
+                if (toggleBtn) {
+                    toggleBtn.textContent = 'Enable Mosaic';
+                    toggleBtn.classList.remove('bg-red-600');
+                    toggleBtn.classList.add('bg-purple-600');
+                }
+                
+                // Hide controls
+                const mosaicControls = document.getElementById('mosaic-controls');
+                if (mosaicControls) {
+                    mosaicControls.classList.add('hidden');
+                }
             }
             
             // Stop food detection if it's running

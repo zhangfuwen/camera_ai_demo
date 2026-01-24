@@ -12,6 +12,7 @@ import { VideoProcessingController } from './components/VideoProcessingControlle
 import { ImageProcessingController } from './components/ImageProcessingController.js';
 import { UIController } from './components/UIController.js';
 import { LLMClient } from './components/LLMClient.js';
+import { MosaicEffectController } from './components/MosaicEffectController.js';
 
 // Application state - exposed to window for component communication
 window.app = {
@@ -22,6 +23,7 @@ window.app = {
     imageProcessingController: null,
     uiController: null,
     llmClient: null,
+    mosaicEffectController: null,
     isInitialized: false
 };
 
@@ -47,15 +49,19 @@ async function init() {
         app.videoProcessingController = new VideoProcessingController();
         app.imageProcessingController = new ImageProcessingController();
         app.llmClient = new LLMClient();
+        app.mosaicEffectController = new MosaicEffectController();
         
         // Initialize components
         await initializeComponents();
         
         // Set up event delegation
-        setupEventDelegation();
-        
-        // Initialize camera permission
-        await app.cameraController.initializeCameraPermission();
+    setupEventDelegation();
+    
+    // Set up custom event listeners
+    setupCustomEventListeners();
+    
+    // Initialize camera permission
+    await app.cameraController.initializeCameraPermission();
         
         // Load remembered video file information
         app.videoProcessingController.displayRememberedFile();
@@ -94,6 +100,9 @@ async function initializeComponents() {
     
     // Initialize LLM client
     app.llmClient.initialize();
+    
+    // Initialize mosaic effect controller
+    app.mosaicEffectController.initialize();
 }
 
 /**
@@ -151,6 +160,12 @@ function setupEventDelegation() {
         if (target.matches('#food-detection-btn')) {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('toggleFoodDetection'));
+        }
+        
+        // Mosaic effect controls
+        if (target.matches('#toggle-mosaic-btn')) {
+            event.preventDefault();
+            document.dispatchEvent(new CustomEvent('toggleMosaicEffect'));
         }
         
         // Calorie estimation controls
@@ -312,6 +327,11 @@ function setupEventDelegation() {
                 event.preventDefault();
                 document.dispatchEvent(new CustomEvent('toggleFoodDetection'));
                 break;
+            case 'm':
+            case 'M':
+                event.preventDefault();
+                document.dispatchEvent(new CustomEvent('toggleMosaicEffect'));
+                break;
             case 'c':
             case 'C':
                 event.preventDefault();
@@ -341,7 +361,19 @@ function setupEventDelegation() {
 }
 
 /**
- * Set up drag and drop for video files
+ * Set up custom event listeners for component communication
+ */
+function setupCustomEventListeners() {
+    // Mosaic effect toggle
+    document.addEventListener('toggleMosaicEffect', () => {
+        if (app.mosaicEffectController) {
+            app.mosaicEffectController.toggleMosaicEffect();
+        }
+    });
+}
+
+/**
+ * Setup drag and drop events
  */
 function setupDragAndDrop() {
     const mainVideo = document.getElementById('main-video');
