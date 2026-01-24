@@ -693,17 +693,98 @@ export class CameraController {
      * Toggle picture-in-picture visibility
      */
     togglePipVisibility() {
+        // Use the existing pip-container element from the template
+        this.pipVideoContainer = document.getElementById('pip-container');
+        this.pipVideo = document.getElementById('pip-video');
+        
         if (!this.pipVideoContainer) {
-            this.createPipVideo();
+            console.error('PIP container element not found!');
+            return;
+        }
+        
+        // Toggle visibility of the existing PIP container
+        const isCurrentlyVisible = this.pipVideoContainer.style.display !== 'none' && 
+                                  this.pipVideoContainer.style.visibility !== 'hidden' &&
+                                  this.pipVideoContainer.style.opacity !== '0';
+        
+        if (isCurrentlyVisible) {
+            // Hide the PIP container
+            this.pipVideoContainer.style.display = 'none';
+            this.pipVideoContainer.style.visibility = 'hidden';
+            this.pipVideoContainer.style.opacity = '0';
+            updateStatus('pip-status', 'PIP Camera: Hidden');
         } else {
-            if (this.pipVideoContainer.parentNode) {
-                this.pipVideoContainer.parentNode.removeChild(this.pipVideoContainer);
-                this.pipVideoContainer = null;
-                this.pipVideo = null;
-            } else {
-                document.body.appendChild(this.pipVideoContainer);
+            // Show the PIP container
+            this.pipVideoContainer.style.display = 'block';
+            this.pipVideoContainer.style.visibility = 'visible';
+            this.pipVideoContainer.style.opacity = '1';
+            updateStatus('pip-status', 'PIP Camera: Visible');
+        }
+    }
+    
+    /**
+     * Toggle PIP view visibility without stopping the stream
+     */
+    togglePipView() {
+        console.log('togglePipView called');
+        
+        // Use the existing pip-container element from the template
+        this.pipVideoContainer = document.getElementById('pip-container');
+        this.pipVideo = document.getElementById('pip-video');
+        
+        if (!this.pipVideoContainer) {
+            console.error('PIP container element not found!');
+            return;
+        }
+        
+        console.log('Toggling visibility of existing PIP container');
+        console.log('Current display:', this.pipVideoContainer.style.display);
+        console.log('Current visibility:', this.pipVideoContainer.style.visibility);
+        
+        // Toggle visibility of the existing PIP container
+        const isCurrentlyVisible = this.pipVideoContainer.style.display !== 'none' && 
+                                  this.pipVideoContainer.style.visibility !== 'hidden' &&
+                                  this.pipVideoContainer.style.opacity !== '0';
+        
+        if (isCurrentlyVisible) {
+            console.log('Hiding PIP container');
+            this.pipVideoContainer.style.display = 'none';
+            this.pipVideoContainer.style.visibility = 'hidden';
+            this.pipVideoContainer.style.opacity = '0';
+            
+            // Update button text
+            const togglePipViewBtn = document.getElementById('toggle-pip-visibility-btn');
+            if (togglePipViewBtn) {
+                console.log('Updating button text to Show PIP View');
+                togglePipViewBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Show PIP View
+                `;
+                updateStatus('pip-status', 'PIP Camera: Hidden');
+            }
+        } else {
+            console.log('Showing PIP container');
+            this.pipVideoContainer.style.display = 'block';
+            this.pipVideoContainer.style.visibility = 'visible';
+            this.pipVideoContainer.style.opacity = '1';
+            
+            // Update button text
+            const togglePipViewBtn = document.getElementById('toggle-pip-visibility-btn');
+            if (togglePipViewBtn) {
+                console.log('Updating button text to Hide PIP View');
+                togglePipViewBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 01-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    Hide PIP View
+                `;
+                updateStatus('pip-status', 'PIP Camera: Visible');
             }
         }
+        console.log('togglePipView completed');
     }
 
     /**
@@ -768,6 +849,15 @@ export class CameraController {
         const pipBtn = document.getElementById('toggle-pip-btn');
         if (pipBtn) {
             pipBtn.addEventListener('click', () => this.togglePipVisibility());
+        }
+        
+        // Toggle PIP view visibility button
+        const togglePipViewBtn = document.getElementById('toggle-pip-visibility-btn');
+        if (togglePipViewBtn) {
+            togglePipViewBtn.addEventListener('click', () => {
+                console.log('Toggle PIP visibility button clicked');
+                this.togglePipView();
+            });
         }
         
         // Resolution selector

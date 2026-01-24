@@ -371,6 +371,12 @@ function setupCustomEventListeners() {
         }
     });
     
+    document.addEventListener('togglePipView', () => {
+        if (app.cameraController) {
+            app.cameraController.togglePipView();
+        }
+    });
+    
     // Rotation and mirror controls
     document.addEventListener('setRotation', (e) => {
         if (app.cameraController) {
