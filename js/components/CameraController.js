@@ -186,6 +186,14 @@ export class CameraController {
         // Enable the selector
         resolutionSelect.disabled = false;
         
+        // Set the saved resolution selection if it exists
+        if (this.desiredResolution) {
+            const resolutionValue = `${this.desiredResolution.width}x${this.desiredResolution.height}`;
+            if (resolutionSelect.querySelector(`option[value="${resolutionValue}"]`)) {
+                resolutionSelect.value = resolutionValue;
+            }
+        }
+        
         // Log available options
         console.log('Available resolution options:');
         resolutions.forEach((res, index) => {
