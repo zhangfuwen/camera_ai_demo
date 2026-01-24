@@ -108,7 +108,7 @@ export class MosaicEffectController {
         this.canvas.style.height = (this.videoElement.offsetHeight || this.videoElement.videoHeight || 480) + 'px';
         this.canvas.style.objectFit = 'contain';
         this.canvas.style.pointerEvents = 'none';
-        this.canvas.style.zIndex = '15'; // Above detection overlay (z-index 10)
+        this.canvas.style.zIndex = '9'; // Below detection overlay (z-index 10)
         
         // Initially show the canvas but make it transparent so it doesn't interfere with video display
         this.canvas.style.display = 'block';
@@ -141,10 +141,10 @@ export class MosaicEffectController {
         this.canvas.style.width = (this.videoElement.offsetWidth || this.videoElement.videoWidth || 640) + 'px';
         this.canvas.style.height = (this.videoElement.offsetHeight || this.videoElement.videoHeight || 480) + 'px';
         
-        // Update canvas internal dimensions to match display size
-        // Prioritize video actual dimensions over display dimensions for proper aspect ratio
-        this.canvas.width = this.videoElement.videoWidth || this.videoElement.offsetWidth || 640;
-        this.canvas.height = this.videoElement.videoHeight || this.videoElement.offsetHeight || 480;
+        // Update canvas internal dimensions to match display size, not the video resolution
+        // This ensures the canvas matches the visible video area with object-contain sizing
+        this.canvas.width = this.videoElement.offsetWidth || this.videoElement.videoWidth || 640;
+        this.canvas.height = this.videoElement.offsetHeight || this.videoElement.videoHeight || 480;
     }
 
     /**
@@ -323,35 +323,34 @@ export class MosaicEffectController {
             return;
         }
         
-        // Calculate the aspect ratio to properly draw the video
-        const videoAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
-        
-        // Use the actual canvas dimensions for drawing calculations
-        const canvasWidth = this.canvas.width;
-        const canvasHeight = this.canvas.height;
-        const canvasAspectRatio = canvasWidth / canvasHeight;
+        // Calculate the aspect ratio to properly draw the video content
+        // The video element uses object-contain which maintains aspect ratio
+        const videoNaturalAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
+        const canvasAspectRatio = this.canvas.width / this.canvas.height;
         
         let drawWidth, drawHeight, offsetX, offsetY;
         
-        if (canvasAspectRatio > videoAspectRatio) {
-            // Canvas is wider than video - letterbox (black bars on sides)
-            drawHeight = canvasHeight;
-            drawWidth = drawHeight * videoAspectRatio;
-            offsetX = (canvasWidth - drawWidth) / 2;
+        // Determine how the video would be scaled in the canvas to maintain aspect ratio
+        if (canvasAspectRatio > videoNaturalAspectRatio) {
+            // Canvas is wider relative to video's aspect ratio - letterbox effect
+            drawHeight = this.canvas.height;
+            drawWidth = drawHeight * videoNaturalAspectRatio;
+            offsetX = (this.canvas.width - drawWidth) / 2;
             offsetY = 0;
         } else {
-            // Canvas is taller than video - pillarbox (black bars on top/bottom)
-            drawWidth = canvasWidth;
-            drawHeight = drawWidth / videoAspectRatio;
+            // Canvas is taller relative to video's aspect ratio - pillarbox effect
+            drawWidth = this.canvas.width;
+            drawHeight = drawWidth / videoNaturalAspectRatio;
             offsetX = 0;
-            offsetY = (canvasHeight - drawHeight) / 2;
+            offsetY = (this.canvas.height - drawHeight) / 2;
         }
         
         // Save the current context state
         this.ctx.save();
         
         // Apply transformations (mirror and rotation)
-        this.ctx.translate(canvasWidth / 2, canvasHeight / 2);
+        // First translate to the center of where the video should be drawn
+        this.ctx.translate(offsetX + drawWidth / 2, offsetY + drawHeight / 2);
         
         // Apply mirror (scaleX(-1))
         if (this.isMirrored) {
@@ -362,6 +361,7 @@ export class MosaicEffectController {
         this.ctx.rotate(this.rotationAngle * Math.PI / 180); // Convert degrees to radians
         
         // Draw the video frame to canvas with correct aspect ratio
+        // Draw at (-drawWidth/2, -drawHeight/2) relative to the translated center
         this.ctx.drawImage(
             this.videoElement,
             -drawWidth / 2,
@@ -482,35 +482,34 @@ export class MosaicEffectController {
                     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 } else if (this.isEnabled) {
                     // If mosaic is enabled, draw the video frame and apply mosaic effect
-                    // Calculate the aspect ratio to properly draw the video
-                    const videoAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
-                    
-                    // Use the actual canvas dimensions for drawing calculations
-                    const canvasWidth = this.canvas.width;
-                    const canvasHeight = this.canvas.height;
-                    const canvasAspectRatio = canvasWidth / canvasHeight;
+                    // Calculate the aspect ratio to properly draw the video content
+                    // The video element uses object-contain which maintains aspect ratio
+                    const videoNaturalAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
+                    const canvasAspectRatio = this.canvas.width / this.canvas.height;
                     
                     let drawWidth, drawHeight, offsetX, offsetY;
                     
-                    if (canvasAspectRatio > videoAspectRatio) {
-                        // Canvas is wider than video - letterbox (black bars on sides)
-                        drawHeight = canvasHeight;
-                        drawWidth = drawHeight * videoAspectRatio;
-                        offsetX = (canvasWidth - drawWidth) / 2;
+                    // Determine how the video would be scaled in the canvas to maintain aspect ratio
+                    if (canvasAspectRatio > videoNaturalAspectRatio) {
+                        // Canvas is wider relative to video's aspect ratio - letterbox effect
+                        drawHeight = this.canvas.height;
+                        drawWidth = drawHeight * videoNaturalAspectRatio;
+                        offsetX = (this.canvas.width - drawWidth) / 2;
                         offsetY = 0;
                     } else {
-                        // Canvas is taller than video - pillarbox (black bars on top/bottom)
-                        drawWidth = canvasWidth;
-                        drawHeight = drawWidth / videoAspectRatio;
+                        // Canvas is taller relative to video's aspect ratio - pillarbox effect
+                        drawWidth = this.canvas.width;
+                        drawHeight = drawWidth / videoNaturalAspectRatio;
                         offsetX = 0;
-                        offsetY = (canvasHeight - drawHeight) / 2;
+                        offsetY = (this.canvas.height - drawHeight) / 2;
                     }
                     
                     // Save the current context state
                     this.ctx.save();
                     
                     // Apply transformations (mirror and rotation)
-                    this.ctx.translate(canvasWidth / 2, canvasHeight / 2);
+                    // First translate to the center of where the video should be drawn
+                    this.ctx.translate(offsetX + drawWidth / 2, offsetY + drawHeight / 2);
                     
                     // Apply mirror (scaleX(-1))
                     if (this.isMirrored) {
@@ -521,6 +520,7 @@ export class MosaicEffectController {
                     this.ctx.rotate(this.rotationAngle * Math.PI / 180); // Convert degrees to radians
                     
                     // Draw the video frame to canvas with correct aspect ratio
+                    // Draw at (-drawWidth/2, -drawHeight/2) relative to the translated center
                     this.ctx.drawImage(
                         this.videoElement,
                         -drawWidth / 2,
