@@ -269,11 +269,7 @@ export class FoodDetectionController {
         // Clear previous drawings
         this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
 
-        // Apply the same transformations as the mosaic effect to ensure detection boxes align correctly
-        // First save the current context
-        this.ctx.save();
-        
-        // Calculate aspect ratios for proper positioning
+        // Calculate aspect ratios for proper positioning (same as video display)
         const sourceAspect = sourceWidth / sourceHeight;
         const displayAspect = sourceRect.width / sourceRect.height;
         
@@ -297,10 +293,10 @@ export class FoodDetectionController {
         const scaleX = drawWidth / sourceWidth;
         const scaleY = drawHeight / sourceHeight;
         
-        // Apply transformations: translate to center of video area, scale, then translate back
-        this.ctx.translate(offsetX + drawWidth / 2, offsetY + drawHeight / 2);
-        this.ctx.scale(scaleX, scaleY);
-        this.ctx.translate(-(offsetX + drawWidth / 2), -(offsetY + drawHeight / 2));
+        // Apply scaling transformation directly to the context to match video display
+        this.ctx.save();
+        this.ctx.translate(offsetX, offsetY); // Translate to account for offset
+        this.ctx.scale(scaleX, scaleY);       // Scale to match video display ratio
 
         // Update detection info
         const detectionInfo = document.getElementById('detection-info');
