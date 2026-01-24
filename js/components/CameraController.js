@@ -385,6 +385,9 @@ export class CameraController {
                 if (window.app && window.app.mosaicEffectController && !window.app.mosaicEffectController.videoElement) {
                     window.app.mosaicEffectController.initialize(this.videoElement);
                 }
+                
+                // Apply transforms after camera starts
+                this.applyTransforms();
             } else {
                 this.pipStream = stream;
                 if (!this.pipVideo) {
@@ -1292,8 +1295,13 @@ export class CameraController {
                 // Update the UI sliders to reflect loaded values
                 this.updateColorSliderValues();
                 
-                // Apply the loaded transforms
-                this.applyTransforms();
+                // Update UI controls to reflect loaded transform settings
+                this.updateTransformUI();
+                
+                // Apply the loaded transforms if video element is ready
+                if (this.videoElement && this.stream) {
+                    this.applyTransforms();
+                }
                 
                 // Apply the loaded PIP visibility state
                 if (this.pipVideoElement) {
@@ -1307,6 +1315,30 @@ export class CameraController {
         }
         
         return false;
+    }
+    
+    /**
+     * Update UI controls to reflect current transform settings
+     */
+    updateTransformUI() {
+        // Update rotation select dropdown
+        const rotationSelect = document.getElementById('rotation-select');
+        if (rotationSelect) {
+            rotationSelect.value = this.rotationAngle;
+        }
+        
+        // Update mirror toggle button
+        const mirrorToggle = document.getElementById('mirror-toggle');
+        const mirrorStatus = document.getElementById('mirror-status');
+        
+        if (mirrorStatus) {
+            mirrorStatus.textContent = this.isMirrored ? 'On' : 'Off';
+        }
+        
+        if (mirrorToggle) {
+            mirrorToggle.classList.toggle('bg-gray-600', !this.isMirrored);
+            mirrorToggle.classList.toggle('bg-blue-600', this.isMirrored);
+        }
     }
     
     /**
