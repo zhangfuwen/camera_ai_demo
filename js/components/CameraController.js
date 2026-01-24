@@ -400,6 +400,9 @@ export class CameraController {
                 this.pipVideo.height = settings.height;
                 
                 updateStatus('pip-status', `PIP Camera: Active (${settings.width}x${settings.height})`);
+                
+                // Update PIP UI to match saved visibility state
+                this.updatePipUI();
             }
             
             // Update toggle button state and text
@@ -680,6 +683,8 @@ export class CameraController {
         this.pipVideoContainer.style.top = `${this.pipPosition.y}px`;
         this.pipVideoContainer.appendChild(this.pipVideo);
         
+
+        
         // Add to body
         document.body.appendChild(this.pipVideoContainer);
         
@@ -754,7 +759,53 @@ export class CameraController {
         // Save the updated PIP visibility state
         this.saveAllSettings();
     }
-    
+
+    /**
+     * Update PIP UI to match the saved visibility state
+     */
+    updatePipUI() {
+        // Get the PIP container element
+        const pipContainer = this.pipVideoContainer || document.getElementById('pip-container');
+        const togglePipViewBtn = document.getElementById('toggle-pip-visibility-btn');
+        
+        if (pipContainer) {
+            // Set the visibility based on the saved state
+            if (this.pipVisible) {
+                // Show the PIP container
+                pipContainer.style.display = 'block';
+                pipContainer.style.visibility = 'visible';
+                pipContainer.style.opacity = '1';
+                updateStatus('pip-status', 'PIP Camera: Visible');
+            } else {
+                // Hide the PIP container
+                pipContainer.style.display = 'none';
+                pipContainer.style.visibility = 'hidden';
+                pipContainer.style.opacity = '0';
+                updateStatus('pip-status', 'PIP Camera: Hidden');
+            }
+        }
+        
+        if (togglePipViewBtn) {
+            // Update the button text and icon based on the saved state
+            if (this.pipVisible) {
+                togglePipViewBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 01-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    Hide PIP View
+                `;
+            } else {
+                togglePipViewBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Show PIP View
+                `;
+            }
+        }
+    }
+
     /**
      * Toggle PIP view visibility without stopping the stream
      */
@@ -1303,10 +1354,15 @@ export class CameraController {
                     this.applyTransforms();
                 }
                 
-                // Apply the loaded PIP visibility state
-                if (this.pipVideoElement) {
-                    this.togglePipView();
-                }
+                // Apply the loaded PIP visibility state by ensuring the container visibility matches the saved state
+                // Since the PIP container is in the HTML template, we need to show/hide it according to the saved state
+                setTimeout(() => {
+                    // Wait a bit for the DOM to be ready, then ensure the visibility matches the saved state
+                    if (this.pipVideoContainer || document.getElementById('pip-container')) {
+                        // Update the UI to match the saved state
+                        this.updatePipUI();
+                    }
+                }, 100); // Small delay to ensure UI is ready
                 
                 return true;
             }
