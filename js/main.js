@@ -14,6 +14,7 @@ import { UIController } from './components/UIController.js';
 import { LLMClient } from './components/LLMClient.js';
 import { MosaicEffectController } from './components/MosaicEffectController.js';
 import { VideoRecorderController } from './components/VideoRecorderController.js';
+import { AudioRecorderController } from './components/AudioRecorderController.js';
 
 // Application state - exposed to window for component communication
 window.app = {
@@ -26,6 +27,7 @@ window.app = {
     llmClient: null,
     mosaicEffectController: null,
     videoRecorderController: null,
+    audioRecorderController: null,
     isInitialized: false
 };
 
@@ -53,6 +55,7 @@ async function init() {
         app.llmClient = new LLMClient();
         app.mosaicEffectController = new MosaicEffectController();
         app.videoRecorderController = new VideoRecorderController();
+        app.audioRecorderController = new AudioRecorderController();
         
         // Initialize components
         await initializeComponents();
@@ -109,6 +112,9 @@ async function initializeComponents() {
     
     // Initialize video recorder controller
     app.videoRecorderController.initialize();
+    
+    // Initialize audio recorder controller
+    app.audioRecorderController.initialize();
 }
 
 /**
@@ -278,6 +284,17 @@ function setupEventDelegation() {
         if (target.matches('#save-recorded-video-btn')) {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('saveRecordedVideo'));
+        }
+        
+        // Audio recording controls
+        if (target.matches('#record-audio-btn')) {
+            event.preventDefault();
+            document.dispatchEvent(new CustomEvent('toggleAudioRecording'));
+        }
+        
+        if (target.matches('#save-recorded-audio-btn')) {
+            event.preventDefault();
+            document.dispatchEvent(new CustomEvent('saveRecordedAudio'));
         }
         
         // Color adjustment controls

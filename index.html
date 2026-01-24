@@ -348,6 +348,31 @@
                 </div>
             </div>
 
+            <!-- Audio Recorder Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Audio Recorder</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="space-y-2">
+                        <button id="record-audio-btn" class="w-full p-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                            Start Audio Recording
+                        </button>
+                        <button id="save-recorded-audio-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save Audio Recording
+                        </button>
+                        <div id="audio-recording-status" class="text-center p-2 text-sm bg-gray-700 rounded mt-3">Audio Recording: Not Active</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- LLM Configuration Panel (Hidden by default) -->
             <div id="llm-config-panel" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">

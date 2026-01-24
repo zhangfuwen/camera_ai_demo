@@ -43,7 +43,14 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
     print(f"Created upload directory: {UPLOAD_FOLDER}")
 
+# Create upload directory for audio if it doesn't exist
+AUDIO_UPLOAD_FOLDER = 'recorded_audio'
+if not os.path.exists(AUDIO_UPLOAD_FOLDER):
+    os.makedirs(AUDIO_UPLOAD_FOLDER)
+    print(f"Created audio upload directory: {AUDIO_UPLOAD_FOLDER}")
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['AUDIO_UPLOAD_FOLDER'] = AUDIO_UPLOAD_FOLDER
 
 
 
@@ -335,6 +342,96 @@ def upload_video():
         import traceback
         print(f"[VIDEO UPLOAD] Traceback: {traceback.format_exc()}")
         app.logger.error(f"Error in upload_video: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/upload_audio', methods=['POST'])
+def upload_audio():
+    """
+    Handle audio file uploads and save them with timestamps.
+    
+    Expected form data:
+    - audio: audio file (webm format)
+    - timestamp: timestamp string from client
+    
+    Returns:
+    {
+        "success": true,
+        "filename": "saved_filename.webm",
+        "timestamp": "timestamp_string",
+        "path": "path/to/saved/file"
+    }
+    """
+    try:
+        # Log request received
+        print(f"[AUDIO UPLOAD] Request received at {datetime.now().isoformat()}")
+        print(f"[AUDIO UPLOAD] Request headers: {dict(request.headers)}")
+        print(f"[AUDIO UPLOAD] Request form data keys: {list(request.form.keys())}")
+        print(f"[AUDIO UPLOAD] Request files keys: {list(request.files.keys())}")
+        
+        # Check if audio file is in the request
+        if 'audio' not in request.files:
+            print(f"[AUDIO UPLOAD] ERROR: No audio file in request")
+            return jsonify({"success": False, "error": "No audio file provided"}), 400
+        
+        audio_file = request.files['audio']
+        print(f"[AUDIO UPLOAD] Audio file received: {audio_file.filename}")
+        print(f"[AUDIO UPLOAD] Audio file content type: {audio_file.content_type}")
+        
+        if audio_file.filename == '':
+            print(f"[AUDIO UPLOAD] ERROR: Empty filename")
+            return jsonify({"success": False, "error": "No audio file selected"}), 400
+        
+        # Get timestamp from form data or generate one
+        timestamp = request.form.get('timestamp', datetime.now().isoformat())
+        print(f"[AUDIO UPLOAD] Client timestamp: {timestamp}")
+        
+        # Secure the filename and ensure it has the correct extension
+        filename = werkzeug.utils.secure_filename(audio_file.filename)
+        if not filename.lower().endswith('.webm'):
+            filename += '.webm'
+        
+        # Add timestamp prefix to ensure unique ordering
+        timestamp_prefix = timestamp.replace(':', '-').replace('.', '-')
+        saved_filename = f"{timestamp_prefix}_{filename}"
+        
+        # Save the file
+        file_path = os.path.join(app.config['AUDIO_UPLOAD_FOLDER'], saved_filename)
+        print(f"[AUDIO UPLOAD] Saving file to: {file_path}")
+        
+        audio_file.save(file_path)
+        
+        # Get file size for logging
+        file_size = os.path.getsize(file_path)
+        print(f"[AUDIO UPLOAD] File saved successfully: {saved_filename}")
+        print(f"[AUDIO UPLOAD] File size: {file_size} bytes ({file_size / 1024:.2f} KB)")
+        print(f"[AUDIO UPLOAD] Full path: {os.path.abspath(file_path)}")
+        
+        # List files in upload directory for verification
+        try:
+            existing_files = os.listdir(app.config['AUDIO_UPLOAD_FOLDER'])
+            print(f"[AUDIO UPLOAD] Total files in audio upload directory: {len(existing_files)}")
+            if len(existing_files) <= 5:  # Only list if not too many files
+                print(f"[AUDIO UPLOAD] Files: {sorted(existing_files)}")
+        except Exception as e:
+            print(f"[AUDIO UPLOAD] Warning: Could not list directory contents: {e}")
+        
+        print(f"[AUDIO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
+        
+        return jsonify({
+            "success": True,
+            "filename": saved_filename,
+            "timestamp": timestamp,
+            "path": file_path,
+            "size": file_size
+        })
+    
+    except Exception as e:
+        print(f"[AUDIO UPLOAD] ERROR: {str(e)}")
+        print(f"[AUDIO UPLOAD] Error type: {type(e).__name__}")
+        import traceback
+        print(f"[AUDIO UPLOAD] Traceback: {traceback.format_exc()}")
+        app.logger.error(f"Error in upload_audio: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
