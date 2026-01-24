@@ -235,6 +235,39 @@ export class FoodDetectionController {
         // Clear previous drawings
         this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
 
+        // Apply the same transformations as the mosaic effect to ensure detection boxes align correctly
+        // First save the current context
+        this.ctx.save();
+        
+        // Calculate aspect ratios for proper positioning
+        const sourceAspect = sourceWidth / sourceHeight;
+        const displayAspect = sourceRect.width / sourceRect.height;
+        
+        let drawWidth, drawHeight, offsetX, offsetY;
+        
+        if (displayAspect > sourceAspect) {
+            // Pillarboxed (black bars on sides)
+            drawHeight = sourceRect.height;
+            drawWidth = sourceRect.height * sourceAspect;
+            offsetX = (sourceRect.width - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            // Letterboxed (black bars on top/bottom)
+            drawWidth = sourceRect.width;
+            drawHeight = sourceRect.width / sourceAspect;
+            offsetX = 0;
+            offsetY = (sourceRect.height - drawHeight) / 2;
+        }
+        
+        // Scale to account for the difference between source resolution and display size
+        const scaleX = drawWidth / sourceWidth;
+        const scaleY = drawHeight / sourceHeight;
+        
+        // Apply transformations: translate to center of video area, scale, then translate back
+        this.ctx.translate(offsetX + drawWidth / 2, offsetY + drawHeight / 2);
+        this.ctx.scale(scaleX, scaleY);
+        this.ctx.translate(-(offsetX + drawWidth / 2), -(offsetY + drawHeight / 2));
+
         // Update detection info
         const detectionInfo = document.getElementById('detection-info');
         const foodCount = document.getElementById('food-count');
@@ -313,24 +346,24 @@ export class FoodDetectionController {
                 const boundingBoxAspectRatio = width / height;
                 
                 // Calculate the dimensions and position to maintain aspect ratio
-                let drawWidth, drawHeight, drawX, drawY;
+                let drawMaskWidth, drawMaskHeight, drawX, drawY;
                 
                 if (maskAspectRatio > boundingBoxAspectRatio) {
                     // Mask is wider than the bounding box, fit to width
-                    drawWidth = width;
-                    drawHeight = width / maskAspectRatio;
+                    drawMaskWidth = width;
+                    drawMaskHeight = width / maskAspectRatio;
                     drawX = x1;
-                    drawY = y1 + (height - drawHeight) / 2;
+                    drawY = y1 + (height - drawMaskHeight) / 2;
                 } else {
                     // Mask is taller than the bounding box, fit to height
-                    drawHeight = height;
-                    drawWidth = height * maskAspectRatio;
-                    drawX = x1 + (width - drawWidth) / 2;
+                    drawMaskHeight = height;
+                    drawMaskWidth = height * maskAspectRatio;
+                    drawX = x1 + (width - drawMaskWidth) / 2;
                     drawY = y1;
                 }
                 
                 // Draw the mask on the main canvas with proper aspect ratio
-                this.ctx.drawImage(maskCanvas, drawX, drawY, drawWidth, drawHeight);
+                this.ctx.drawImage(maskCanvas, drawX, drawY, drawMaskWidth, drawMaskHeight);
             }
             
             // Draw bounding box
@@ -348,7 +381,7 @@ export class FoodDetectionController {
             // Save the current context state
             this.ctx.save();
             
-            // Flip the context horizontally for text
+            // Flip the context horizontally for text (accounting for the coordinate system)
             this.ctx.scale(-1, 1);
             
             // Draw label text (flipped position to account for the scale transformation)
@@ -358,6 +391,9 @@ export class FoodDetectionController {
             // Restore the context state
             this.ctx.restore();
         });
+        
+        // Restore the original context state
+        this.ctx.restore();
     }
 
     /**
