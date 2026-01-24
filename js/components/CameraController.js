@@ -22,6 +22,13 @@ export class CameraController {
         // 添加旋转和镜像状态变量
         this.rotationAngle = 0;
         this.isMirrored = false;
+        // Color adjustment properties
+        this.brightness = 100;
+        this.contrast = 100;
+        this.saturation = 100;
+        this.redChannel = 100;
+        this.greenChannel = 100;
+        this.blueChannel = 100;
     }
 
     /**
@@ -878,6 +885,9 @@ export class CameraController {
         
         // Setup transform controls (rotation and mirror)
         this.setupTransformControls();
+        
+        // Setup color adjustment controls
+        this.setupColorAdjustmentControls();
     }
 
     /**
@@ -1003,6 +1013,202 @@ export class CameraController {
     }
     
     /**
+     * Setup color adjustment controls event listeners
+     */
+    setupColorAdjustmentControls() {
+        // Brightness slider
+        const brightnessSlider = document.getElementById('brightness-slider');
+        const brightnessValue = document.getElementById('brightness-value');
+        if (brightnessSlider && brightnessValue) {
+            brightnessSlider.addEventListener('input', (e) => {
+                const value = e.target.value;
+                brightnessValue.textContent = `${value}%`;
+                this.adjustBrightness(value);
+            });
+        }
+
+        // Contrast slider
+        const contrastSlider = document.getElementById('contrast-slider');
+        const contrastValue = document.getElementById('contrast-value');
+        if (contrastSlider && contrastValue) {
+            contrastSlider.addEventListener('input', (e) => {
+                const value = e.target.value;
+                contrastValue.textContent = `${value}%`;
+                this.adjustContrast(value);
+            });
+        }
+
+        // Saturation slider
+        const saturationSlider = document.getElementById('saturation-slider');
+        const saturationValue = document.getElementById('saturation-value');
+        if (saturationSlider && saturationValue) {
+            saturationSlider.addEventListener('input', (e) => {
+                const value = e.target.value;
+                saturationValue.textContent = `${value}%`;
+                this.adjustSaturation(value);
+            });
+        }
+
+        // Red channel slider
+        const redChannelSlider = document.getElementById('red-channel-slider');
+        const redChannelValue = document.getElementById('red-channel-value');
+        if (redChannelSlider && redChannelValue) {
+            redChannelSlider.addEventListener('input', (e) => {
+                const value = e.target.value;
+                redChannelValue.textContent = `${value}%`;
+                this.adjustRedChannel(value);
+            });
+        }
+
+        // Green channel slider
+        const greenChannelSlider = document.getElementById('green-channel-slider');
+        const greenChannelValue = document.getElementById('green-channel-value');
+        if (greenChannelSlider && greenChannelValue) {
+            greenChannelSlider.addEventListener('input', (e) => {
+                const value = e.target.value;
+                greenChannelValue.textContent = `${value}%`;
+                this.adjustGreenChannel(value);
+            });
+        }
+
+        // Blue channel slider
+        const blueChannelSlider = document.getElementById('blue-channel-slider');
+        const blueChannelValue = document.getElementById('blue-channel-value');
+        if (blueChannelSlider && blueChannelValue) {
+            blueChannelSlider.addEventListener('input', (e) => {
+                const value = e.target.value;
+                blueChannelValue.textContent = `${value}%`;
+                this.adjustBlueChannel(value);
+            });
+        }
+    }
+
+    /**
+     * Adjust brightness of video element
+     * @param {number} value - Brightness percentage (0-200)
+     */
+    adjustBrightness(value) {
+        if (!this.videoElement) return;
+        
+        // Update the brightness value
+        this.brightness = value;
+        this.applyColorAdjustments();
+    }
+
+    /**
+     * Adjust contrast of video element
+     * @param {number} value - Contrast percentage (0-200)
+     */
+    adjustContrast(value) {
+        if (!this.videoElement) return;
+        
+        // Update the contrast value
+        this.contrast = value;
+        this.applyColorAdjustments();
+    }
+
+    /**
+     * Adjust saturation of video element
+     * @param {number} value - Saturation percentage (0-200)
+     */
+    adjustSaturation(value) {
+        if (!this.videoElement) return;
+        
+        // Update the saturation value
+        this.saturation = value;
+        this.applyColorAdjustments();
+    }
+
+    /**
+     * Adjust red channel of video element
+     * @param {number} value - Red channel percentage (0-200)
+     */
+    adjustRedChannel(value) {
+        if (!this.videoElement) return;
+        
+        // Update the red channel value
+        this.redChannel = value;
+        this.applyColorAdjustments();
+    }
+
+    /**
+     * Adjust green channel of video element
+     * @param {number} value - Green channel percentage (0-200)
+     */
+    adjustGreenChannel(value) {
+        if (!this.videoElement) return;
+        
+        // Update the green channel value
+        this.greenChannel = value;
+        this.applyColorAdjustments();
+    }
+
+    /**
+     * Adjust blue channel of video element
+     * @param {number} value - Blue channel percentage (0-200)
+     */
+    adjustBlueChannel(value) {
+        if (!this.videoElement) return;
+        
+        // Update the blue channel value
+        this.blueChannel = value;
+        this.applyColorAdjustments();
+    }
+
+    /**
+     * Apply all color adjustments to video element using CSS filters
+     */
+    applyColorAdjustments() {
+        if (!this.videoElement) return;
+        
+        // Set default values if not defined
+        this.brightness = this.brightness || 100;
+        this.contrast = this.contrast || 100;
+        this.saturation = this.saturation || 100;
+        this.redChannel = this.redChannel || 100;
+        this.greenChannel = this.greenChannel || 100;
+        this.blueChannel = this.blueChannel || 100;
+
+        // Since CSS doesn't support individual RGB channel adjustments directly,
+        // we'll use a combination of available CSS filters to approximate the effect
+        // For red channel issues, reducing red and increasing blue/green can help
+        
+        // Calculate adjusted values based on channel adjustments
+        // Note: We can't directly control individual RGB channels with CSS filters,
+        // but we can achieve some color balance adjustment through combinations of filters
+        let filterString = '';
+        
+        // Apply basic adjustments
+        if (this.brightness !== 100) {
+            filterString += `brightness(${this.brightness}%) `;
+        }
+        if (this.contrast !== 100) {
+            filterString += `contrast(${this.contrast}%) `;
+        }
+        if (this.saturation !== 100) {
+            filterString += `saturate(${this.saturation}%) `;
+        }
+        
+        // To address the red skew, we can use hue-rotate to shift colors
+        // and opacity adjustments to simulate channel balancing
+        // Calculate hue rotation based on red excess (reducing red dominance)
+        const redExcess = this.redChannel - 100;
+        const blueDeficit = 100 - this.blueChannel;
+        
+        // If red channel is too high, apply a slight hue rotation toward cyan
+        if (redExcess > 0 || blueDeficit > 0) {
+            // Calculate an appropriate hue rotation value to compensate for red excess
+            const hueAdjustment = Math.min(20, Math.max(-20, (blueDeficit - redExcess) / 2));
+            if (Math.abs(hueAdjustment) > 0.5) {  // Only apply if significant
+                filterString += `hue-rotate(${hueAdjustment}deg) `;
+            }
+        }
+        
+        // Apply the combined CSS filters to the video element
+        this.videoElement.style.filter = filterString.trim();
+    }
+
+    /**
      * Cleanup resources
      */
     cleanup() {
@@ -1012,5 +1218,7 @@ export class CameraController {
         if (this.pipVideoContainer && this.pipVideoContainer.parentNode) {
             this.pipVideoContainer.parentNode.removeChild(this.pipVideoContainer);
         }
+        
+
     }
 }

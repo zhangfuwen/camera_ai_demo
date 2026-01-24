@@ -261,6 +261,37 @@ function setupEventDelegation() {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('saveRecordedVideo'));
         }
+        
+        // Color adjustment controls
+        if (target.matches('#brightness-slider')) {
+            const value = target.value;
+            document.dispatchEvent(new CustomEvent('adjustBrightness', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (target.matches('#contrast-slider')) {
+            const value = target.value;
+            document.dispatchEvent(new CustomEvent('adjustContrast', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (target.matches('#saturation-slider')) {
+            const value = target.value;
+            document.dispatchEvent(new CustomEvent('adjustSaturation', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (target.matches('#red-channel-slider')) {
+            const value = target.value;
+            document.dispatchEvent(new CustomEvent('adjustRedChannel', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (target.matches('#green-channel-slider')) {
+            const value = target.value;
+            document.dispatchEvent(new CustomEvent('adjustGreenChannel', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (target.matches('#blue-channel-slider')) {
+            const value = target.value;
+            document.dispatchEvent(new CustomEvent('adjustBlueChannel', { detail: { value: parseInt(value) } }));
+        }
     });
     
     // File input change event
@@ -288,6 +319,37 @@ function setupEventDelegation() {
             document.dispatchEvent(new CustomEvent('pipCameraChanged', { 
                 detail: { deviceId: event.target.value } 
             }));
+        }
+        
+        // Color adjustment sliders - for real-time updates
+        if (event.target.matches('#brightness-slider')) {
+            const value = event.target.value;
+            document.dispatchEvent(new CustomEvent('adjustBrightness', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (event.target.matches('#contrast-slider')) {
+            const value = event.target.value;
+            document.dispatchEvent(new CustomEvent('adjustContrast', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (event.target.matches('#saturation-slider')) {
+            const value = event.target.value;
+            document.dispatchEvent(new CustomEvent('adjustSaturation', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (event.target.matches('#red-channel-slider')) {
+            const value = event.target.value;
+            document.dispatchEvent(new CustomEvent('adjustRedChannel', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (event.target.matches('#green-channel-slider')) {
+            const value = event.target.value;
+            document.dispatchEvent(new CustomEvent('adjustGreenChannel', { detail: { value: parseInt(value) } }));
+        }
+        
+        if (event.target.matches('#blue-channel-slider')) {
+            const value = event.target.value;
+            document.dispatchEvent(new CustomEvent('adjustBlueChannel', { detail: { value: parseInt(value) } }));
         }
     });
     
@@ -387,6 +449,43 @@ function setupCustomEventListeners() {
     document.addEventListener('toggleMirror', () => {
         if (app.cameraController) {
             app.cameraController.toggleMirror();
+        }
+    });
+    
+    // Color adjustment controls
+    document.addEventListener('adjustBrightness', (e) => {
+        if (app.cameraController) {
+            app.cameraController.adjustBrightness(e.detail.value);
+        }
+    });
+    
+    document.addEventListener('adjustContrast', (e) => {
+        if (app.cameraController) {
+            app.cameraController.adjustContrast(e.detail.value);
+        }
+    });
+    
+    document.addEventListener('adjustSaturation', (e) => {
+        if (app.cameraController) {
+            app.cameraController.adjustSaturation(e.detail.value);
+        }
+    });
+    
+    document.addEventListener('adjustRedChannel', (e) => {
+        if (app.cameraController) {
+            app.cameraController.adjustRedChannel(e.detail.value);
+        }
+    });
+    
+    document.addEventListener('adjustGreenChannel', (e) => {
+        if (app.cameraController) {
+            app.cameraController.adjustGreenChannel(e.detail.value);
+        }
+    });
+    
+    document.addEventListener('adjustBlueChannel', (e) => {
+        if (app.cameraController) {
+            app.cameraController.adjustBlueChannel(e.detail.value);
         }
     });
 }
