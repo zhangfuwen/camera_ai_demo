@@ -14,17 +14,23 @@ export class MosaicEffectController {
         this.pixelSize = 10; // Default pixelation size
         this.isEnabled = false;
         this.animationFrameId = null;
+        this.rotationAngle = 0;
+        this.isMirrored = false;
+        this.isRedFilled = false;
     }
 
     /**
      * Initialize mosaic effect controller
      * @param {HTMLVideoElement} videoElement - Video element to apply effect to
+     * @param {CameraController} cameraController - Reference to camera controller for transformations
      */
-    initialize(videoElement) {
+    initialize(videoElement, cameraController = null) {
         this.videoElement = videoElement;
+        this.cameraController = cameraController;
         
         // Create canvas for processing
         this.canvas = document.createElement('canvas');
+        this.canvas.id = 'mosaic-canvas'; // Add ID for easy identification
         this.ctx = this.canvas.getContext('2d');
         
         // Set up event listeners
@@ -32,6 +38,16 @@ export class MosaicEffectController {
         
         // Hide the original video and show the canvas
         this.setupCanvasDisplay();
+        
+        // Initialize canvas dimensions to match video actual resolution
+        // Defer this operation until the video element is properly rendered
+        setTimeout(() => {
+            if (this.videoElement) {
+                // Prioritize actual video dimensions over display dimensions
+                this.canvas.width = this.videoElement.videoWidth || this.videoElement.offsetWidth || 640;
+                this.canvas.height = this.videoElement.videoHeight || this.videoElement.offsetHeight || 480;
+            }
+        }, 0);
     }
 
     /**
@@ -57,6 +73,22 @@ export class MosaicEffectController {
                 this.toggleMosaicEffect();
             });
         }
+        
+        // Toggle red canvas button
+        const toggleRedCanvasBtn = document.getElementById('toggle-red-canvas-btn');
+        if (toggleRedCanvasBtn) {
+            toggleRedCanvasBtn.addEventListener('click', () => {
+                this.toggleRedCanvas();
+            });
+        }
+        
+        // Add event listener for the save canvas button
+        const saveCanvasBtn = document.getElementById('save-canvas-btn');
+        if (saveCanvasBtn) {
+            saveCanvasBtn.addEventListener('click', () => {
+                this.saveCanvasAsJPEG();
+            });
+        }
     }
 
     /**
@@ -66,24 +98,53 @@ export class MosaicEffectController {
         if (!this.videoElement || !this.canvas) return;
         
         // Position the canvas exactly where the video is
-        const videoRect = this.videoElement.getBoundingClientRect();
         const videoContainer = this.videoElement.parentElement;
         
         // Set canvas styles to match the video
         this.canvas.style.position = 'absolute';
-        this.canvas.style.top = '0';
-        this.canvas.style.left = '0';
-        this.canvas.style.width = '100%';
-        this.canvas.style.height = '100%';
+        this.canvas.style.top = (this.videoElement.offsetTop || 0) + 'px';
+        this.canvas.style.left = (this.videoElement.offsetLeft || 0) + 'px';
+        this.canvas.style.width = (this.videoElement.offsetWidth || this.videoElement.videoWidth || 640) + 'px';
+        this.canvas.style.height = (this.videoElement.offsetHeight || this.videoElement.videoHeight || 480) + 'px';
         this.canvas.style.objectFit = 'contain';
         this.canvas.style.pointerEvents = 'none';
-        this.canvas.style.zIndex = '5'; // Below detection overlay (z-index 10)
+        this.canvas.style.zIndex = '15'; // Above detection overlay (z-index 10)
         
-        // Initially hide the canvas
-        this.canvas.style.display = 'none';
+        // Initially show the canvas but make it transparent so it doesn't interfere with video display
+        this.canvas.style.display = 'block';
+        this.canvas.style.opacity = '0';
         
         // Add canvas to the container
         videoContainer.appendChild(this.canvas);
+        
+        // Add a resize observer to sync canvas size with video element
+        if (window.ResizeObserver) {
+            this.resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    if (entry.target === this.videoElement) {
+                        this.updateCanvasPosition();
+                    }
+                }
+            });
+            this.resizeObserver.observe(this.videoElement, { box: 'border-box' });
+        }
+    }
+    
+    /**
+     * Update canvas position and size to match video element
+     */
+    updateCanvasPosition() {
+        if (!this.videoElement || !this.canvas) return;
+        
+        this.canvas.style.top = (this.videoElement.offsetTop || 0) + 'px';
+        this.canvas.style.left = (this.videoElement.offsetLeft || 0) + 'px';
+        this.canvas.style.width = (this.videoElement.offsetWidth || this.videoElement.videoWidth || 640) + 'px';
+        this.canvas.style.height = (this.videoElement.offsetHeight || this.videoElement.videoHeight || 480) + 'px';
+        
+        // Update canvas internal dimensions to match display size
+        // Prioritize video actual dimensions over display dimensions for proper aspect ratio
+        this.canvas.width = this.videoElement.videoWidth || this.videoElement.offsetWidth || 640;
+        this.canvas.height = this.videoElement.videoHeight || this.videoElement.offsetHeight || 480;
     }
 
     /**
@@ -92,37 +153,73 @@ export class MosaicEffectController {
     toggleMosaicEffect() {
         this.isEnabled = !this.isEnabled;
         
-        const toggleBtn = document.getElementById('toggle-mosaic-btn');
+        // Update button state
+        const mosaicButton = document.getElementById('mosaic-button');
+        if (mosaicButton) {
+            mosaicButton.classList.toggle('bg-blue-500', this.isEnabled);
+            mosaicButton.classList.toggle('bg-gray-500', !this.isEnabled);
+            mosaicButton.textContent = this.isEnabled ? 'Disable Mosaic' : 'Enable Mosaic';
+        }
+        
+        // Show/hide mosaic controls
         const mosaicControls = document.getElementById('mosaic-controls');
+        if (mosaicControls) {
+            mosaicControls.style.display = this.isEnabled ? 'block' : 'none';
+        }
         
         if (this.isEnabled) {
-            // Enable mosaic effect
-            if (toggleBtn) {
-                toggleBtn.textContent = 'Disable Mosaic';
-                toggleBtn.classList.add('bg-red-600');
-                toggleBtn.classList.remove('bg-blue-600');
-            }
-            
-            if (mosaicControls) {
-                showElement(mosaicControls);
-            }
-            
             this.startProcessing();
-            updateStatus('main-status', 'Mosaic effect enabled');
         } else {
-            // Disable mosaic effect
-            if (toggleBtn) {
-                toggleBtn.textContent = 'Enable Mosaic';
-                toggleBtn.classList.remove('bg-red-600');
-                toggleBtn.classList.add('bg-blue-600');
-            }
-            
-            if (mosaicControls) {
-                hideElement(mosaicControls);
-            }
-            
             this.stopProcessing();
-            updateStatus('main-status', 'Mosaic effect disabled');
+        }
+    }
+    
+    /**
+     * Toggle between red fill and mosaic effect
+     */
+    toggleRedCanvas() {
+        if (!this.canvas || !this.ctx) return;
+        
+        // Toggle red fill state
+        if (!this.isRedFilled) {
+            // Fill canvas with red
+            this.ctx.fillStyle = 'red';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.isRedFilled = true;
+            
+            // Update button text
+            const redCanvasBtn = document.getElementById('toggle-red-canvas-btn');
+            if (redCanvasBtn) {
+                redCanvasBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Show Mosaic
+                `;
+            }
+        } else {
+            // Restore mosaic effect if enabled
+            this.isRedFilled = false;
+            
+            // Update button text
+            const redCanvasBtn = document.getElementById('toggle-red-canvas-btn');
+            if (redCanvasBtn) {
+                redCanvasBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Fill Canvas Red
+                `;
+            }
+            
+            // If mosaic is enabled, restart processing to show the mosaic effect
+            if (this.isEnabled) {
+                this.stopProcessing();
+                this.startProcessing();
+            } else {
+                // Clear the canvas if mosaic is not enabled
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
         }
     }
 
@@ -134,16 +231,40 @@ export class MosaicEffectController {
         
         this.isProcessing = true;
         
-        // Show canvas and hide video
-        this.canvas.style.display = 'block';
-        this.videoElement.style.opacity = '0';
+        // Show canvas by making it opaque and hide video
+        if (this.canvas) {
+            this.canvas.style.opacity = '1';
+        }
         
-        // Set canvas size to match video
-        this.canvas.width = this.videoElement.videoWidth || 640;
-        this.canvas.height = this.videoElement.videoHeight || 480;
+        // Update canvas dimensions to match current video display size
+        this.updateCanvasPosition();
         
-        // Start processing loop
-        this.processFrame();
+        if (this.videoElement) {
+            this.videoElement.style.opacity = '0';
+        }
+        
+        // Wait for video to be loaded before starting processing
+        const waitForVideo = () => {
+            if (this.videoElement.readyState >= 2) { // HAVE_CURRENT_DATA or greater
+                // Start processing loop
+                this.processFrame();
+            } else {
+                setTimeout(waitForVideo, 100);
+            }
+        };
+        
+        waitForVideo();
+        
+        // Test: Temporarily fill canvas with red to verify it's working
+        // Uncomment the next lines to see a red canvas
+        /*
+        if (this.canvas && this.ctx) {
+            const canvasWidth = this.canvas.width;
+            const canvasHeight = this.canvas.height;
+            this.ctx.fillStyle = 'red';
+            this.ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        }
+        */
     }
 
     /**
@@ -152,9 +273,19 @@ export class MosaicEffectController {
     stopProcessing() {
         this.isProcessing = false;
         
-        // Hide canvas and show video
-        this.canvas.style.display = 'none';
-        this.videoElement.style.opacity = '1';
+        // Disconnect the resize observer to prevent memory leaks
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+        
+        // Make canvas transparent to show video again
+        if (this.canvas) {
+            this.canvas.style.opacity = '0';
+        }
+        if (this.videoElement) {
+            this.videoElement.style.opacity = '1';
+        }
         
         // Cancel animation frame
         if (this.animationFrameId) {
@@ -167,12 +298,82 @@ export class MosaicEffectController {
      * Process a single frame with mosaic effect
      */
     processFrame() {
-        if (!this.isProcessing) return;
+        if (!this.isProcessing || !this.videoElement || this.videoElement.readyState !== 4) return;
         
-        // Draw the video frame to canvas
-        this.ctx.drawImage(this.videoElement, 0, 0, this.canvas.width, this.canvas.height);
+        // Sync rotation and mirroring from camera controller if available
+        if (this.cameraController) {
+            this.rotationAngle = this.cameraController.rotationAngle;
+            this.isMirrored = this.cameraController.isMirrored;
+        }
         
-        // Apply mosaic effect
+        // Update canvas dimensions to match current video display size
+        // This ensures the canvas internal dimensions match the display dimensions
+        this.updateCanvasPosition();
+        
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // If red fill is active, fill with red and return early
+        if (this.isRedFilled) {
+            this.ctx.fillStyle = 'red';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // Continue processing
+            this.animationFrameId = requestAnimationFrame(() => this.processFrame());
+            return;
+        }
+        
+        // Calculate the aspect ratio to properly draw the video
+        const videoAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
+        
+        // Use the actual canvas dimensions for drawing calculations
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+        const canvasAspectRatio = canvasWidth / canvasHeight;
+        
+        let drawWidth, drawHeight, offsetX, offsetY;
+        
+        if (canvasAspectRatio > videoAspectRatio) {
+            // Canvas is wider than video - letterbox (black bars on sides)
+            drawHeight = canvasHeight;
+            drawWidth = drawHeight * videoAspectRatio;
+            offsetX = (canvasWidth - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            // Canvas is taller than video - pillarbox (black bars on top/bottom)
+            drawWidth = canvasWidth;
+            drawHeight = drawWidth / videoAspectRatio;
+            offsetX = 0;
+            offsetY = (canvasHeight - drawHeight) / 2;
+        }
+        
+        // Save the current context state
+        this.ctx.save();
+        
+        // Apply transformations (mirror and rotation)
+        this.ctx.translate(canvasWidth / 2, canvasHeight / 2);
+        
+        // Apply mirror (scaleX(-1))
+        if (this.isMirrored) {
+            this.ctx.scale(-1, 1);
+        }
+        
+        // Apply rotation
+        this.ctx.rotate(this.rotationAngle * Math.PI / 180); // Convert degrees to radians
+        
+        // Draw the video frame to canvas with correct aspect ratio
+        this.ctx.drawImage(
+            this.videoElement,
+            -drawWidth / 2,
+            -drawHeight / 2,
+            drawWidth,
+            drawHeight
+        );
+        
+        // Restore the context state
+        this.ctx.restore();
+        
+        // Apply mosaic effect to the transformed image
         this.applyMosaicEffect();
         
         // Continue processing
@@ -239,5 +440,147 @@ export class MosaicEffectController {
      */
     setPixelSize(newSize) {
         this.pixelSize = Math.max(1, newSize); // Ensure minimum size is 1
+    }
+    
+    /**
+     * Save the canvas content as a JPEG image
+     */
+    saveCanvasAsJPEG() {
+        if (!this.canvas) {
+            console.error('Canvas not found');
+            return;
+        }
+        
+        try {
+            // Temporarily make canvas visible if it's transparent to ensure content is rendered
+            const originalOpacity = this.canvas.style.opacity;
+            const originalDisplay = this.canvas.style.display;
+            
+            // Make canvas visible for rendering
+            this.canvas.style.display = 'block';
+            this.canvas.style.opacity = '1';
+            
+            // Ensure canvas has current content by forcing a render if needed
+            if (this.videoElement && this.ctx) {
+                // Update canvas dimensions to match video's actual resolution if available
+                if (this.videoElement.videoWidth && this.videoElement.videoHeight) {
+                    // Use the actual video resolution to maintain correct aspect ratio
+                    this.canvas.width = this.videoElement.videoWidth;
+                    this.canvas.height = this.videoElement.videoHeight;
+                } else {
+                    // Fallback to display size if video metadata isn't ready yet
+                    this.updateCanvasPosition();
+                }
+                
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw video frame based on current state
+                if (this.isRedFilled) {
+                    // Draw red fill if red fill is active
+                    this.ctx.fillStyle = 'red';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                } else if (this.isEnabled) {
+                    // If mosaic is enabled, draw the video frame and apply mosaic effect
+                    // Calculate the aspect ratio to properly draw the video
+                    const videoAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
+                    
+                    // Use the actual canvas dimensions for drawing calculations
+                    const canvasWidth = this.canvas.width;
+                    const canvasHeight = this.canvas.height;
+                    const canvasAspectRatio = canvasWidth / canvasHeight;
+                    
+                    let drawWidth, drawHeight, offsetX, offsetY;
+                    
+                    if (canvasAspectRatio > videoAspectRatio) {
+                        // Canvas is wider than video - letterbox (black bars on sides)
+                        drawHeight = canvasHeight;
+                        drawWidth = drawHeight * videoAspectRatio;
+                        offsetX = (canvasWidth - drawWidth) / 2;
+                        offsetY = 0;
+                    } else {
+                        // Canvas is taller than video - pillarbox (black bars on top/bottom)
+                        drawWidth = canvasWidth;
+                        drawHeight = drawWidth / videoAspectRatio;
+                        offsetX = 0;
+                        offsetY = (canvasHeight - drawHeight) / 2;
+                    }
+                    
+                    // Save the current context state
+                    this.ctx.save();
+                    
+                    // Apply transformations (mirror and rotation)
+                    this.ctx.translate(canvasWidth / 2, canvasHeight / 2);
+                    
+                    // Apply mirror (scaleX(-1))
+                    if (this.isMirrored) {
+                        this.ctx.scale(-1, 1);
+                    }
+                    
+                    // Apply rotation
+                    this.ctx.rotate(this.rotationAngle * Math.PI / 180); // Convert degrees to radians
+                    
+                    // Draw the video frame to canvas with correct aspect ratio
+                    this.ctx.drawImage(
+                        this.videoElement,
+                        -drawWidth / 2,
+                        -drawHeight / 2,
+                        drawWidth,
+                        drawHeight
+                    );
+                    
+                    // Restore the context state
+                    this.ctx.restore();
+                    
+                    // Apply mosaic effect to the transformed image
+                    this.applyMosaicEffect();
+                } else {
+                    // Otherwise, draw the raw video frame
+                    this.ctx.drawImage(this.videoElement, 0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+            
+            // Create a temporary canvas to ensure proper JPEG encoding
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCanvas.width = this.canvas.width;
+            tempCanvas.height = this.canvas.height;
+            
+            // Draw the current canvas content to the temporary canvas
+            tempCtx.drawImage(this.canvas, 0, 0);
+            
+            // Convert to JPEG blob
+            tempCanvas.toBlob((blob) => {
+                if (blob) {
+                    // Create download link
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `mosaic-effect-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+                    
+                    // Trigger download
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // Clean up
+                    URL.revokeObjectURL(url);
+                    
+                    console.log('Canvas saved as JPEG successfully');
+                    
+                    // Log the dimensions of the saved image
+                    console.log(`Saved image dimensions: ${tempCanvas.width}x${tempCanvas.height}`);
+                } else {
+                    console.error('Failed to create JPEG blob');
+                }
+                
+                // Restore original visibility
+                this.canvas.style.opacity = originalOpacity;
+                this.canvas.style.display = originalDisplay;
+            }, 'image/jpeg', 0.9); // 90% quality JPEG
+        } catch (error) {
+            console.error('Error saving canvas as JPEG:', error);
+        }
     }
 }

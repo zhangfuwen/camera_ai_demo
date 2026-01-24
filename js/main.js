@@ -168,6 +168,18 @@ function setupEventDelegation() {
             document.dispatchEvent(new CustomEvent('toggleMosaicEffect'));
         }
         
+        // Red canvas toggle
+        if (target.matches('#toggle-red-canvas-btn')) {
+            event.preventDefault();
+            document.dispatchEvent(new CustomEvent('toggleRedCanvas'));
+        }
+        
+        // Save canvas as JPEG
+        if (target.matches('#save-canvas-btn')) {
+            event.preventDefault();
+            document.dispatchEvent(new CustomEvent('saveCanvasAsJPEG'));
+        }
+        
         // Calorie estimation controls
         if (target.matches('#calorie-estimation-btn')) {
             event.preventDefault();
@@ -430,6 +442,20 @@ function setupCustomEventListeners() {
     document.addEventListener('toggleMosaicEffect', () => {
         if (app.mosaicEffectController) {
             app.mosaicEffectController.toggleMosaicEffect();
+        }
+    });
+    
+    // Red canvas toggle
+    document.addEventListener('toggleRedCanvas', () => {
+        if (app.mosaicEffectController) {
+            app.mosaicEffectController.toggleRedCanvas();
+        }
+    });
+    
+    // Save canvas as JPEG
+    document.addEventListener('saveCanvasAsJPEG', () => {
+        if (app.mosaicEffectController) {
+            app.mosaicEffectController.saveCanvasAsJPEG();
         }
     });
     

@@ -77,8 +77,8 @@ export class CameraController {
         // Load all saved camera settings from local storage
         this.loadAllSettings();
         
-        // Initialize camera
-        await this.startCamera();
+        // Don't initialize camera automatically - let user control it manually
+        // await this.startCamera();
     }
 
     /**
@@ -256,6 +256,13 @@ export class CameraController {
             this.rotationAngle = angle;
             this.applyTransforms();
             this.saveAllSettings();
+            
+            // If mosaic is enabled, restart processing to apply new transformation
+            if (window.app && window.app.mosaicEffectController && window.app.mosaicEffectController.isEnabled) {
+                window.app.mosaicEffectController.stopProcessing();
+                window.app.mosaicEffectController.startProcessing();
+            }
+            
             updateStatus('main-status', `Main Camera: Active - Rotation: ${angle}°`);
         }
     }
@@ -278,6 +285,12 @@ export class CameraController {
         if (mirrorToggle) {
             mirrorToggle.classList.toggle('bg-gray-600', !this.isMirrored);
             mirrorToggle.classList.toggle('bg-blue-600', this.isMirrored);
+        }
+        
+        // If mosaic is enabled, restart processing to apply new transformation
+        if (window.app && window.app.mosaicEffectController && window.app.mosaicEffectController.isEnabled) {
+            window.app.mosaicEffectController.stopProcessing();
+            window.app.mosaicEffectController.startProcessing();
         }
         
         updateStatus('main-status', `Main Camera: Active - Mirror: ${this.isMirrored ? 'On' : 'Off'}`);
@@ -410,9 +423,15 @@ export class CameraController {
                     mosaicBtn.disabled = false;
                 }
                 
-                // Initialize mosaic effect controller if not already done
-                if (window.app && window.app.mosaicEffectController && !window.app.mosaicEffectController.videoElement) {
-                    window.app.mosaicEffectController.initialize(this.videoElement);
+                // Enable red canvas button when main camera is active
+                const redCanvasBtn = document.getElementById('toggle-red-canvas-btn');
+                if (redCanvasBtn) {
+                    redCanvasBtn.disabled = false;
+                }
+                
+                // Initialize or re-initialize mosaic effect controller
+                if (window.app && window.app.mosaicEffectController) {
+                    window.app.mosaicEffectController.initialize(this.videoElement, this);
                 }
                 
                 // Apply transforms and color adjustments after camera starts
@@ -474,22 +493,32 @@ export class CameraController {
             }
             
             // Stop mosaic effect if it's running
-            if (window.app && window.app.mosaicEffectController && window.app.mosaicEffectController.isEnabled) {
+            if (window.app && window.app.mosaicEffectController) {
                 window.app.mosaicEffectController.stopProcessing();
                 window.app.mosaicEffectController.isEnabled = false;
+                
+                // Reset the video element so it gets reinitialized on next camera start
+                window.app.mosaicEffectController.videoElement = null;
                 
                 // Reset button state
                 const toggleBtn = document.getElementById('toggle-mosaic-btn');
                 if (toggleBtn) {
                     toggleBtn.textContent = 'Enable Mosaic';
                     toggleBtn.classList.remove('bg-red-600');
-                    toggleBtn.classList.add('bg-purple-600');
+                    toggleBtn.classList.add('bg-blue-600');
+                    toggleBtn.disabled = false; // Ensure button is enabled after camera stops
                 }
                 
                 // Hide controls
                 const mosaicControls = document.getElementById('mosaic-controls');
                 if (mosaicControls) {
-                    mosaicControls.classList.add('hidden');
+                    hideElement(mosaicControls);
+                }
+                
+                // Also reset red canvas button state to enabled
+                const redCanvasBtn = document.getElementById('toggle-red-canvas-btn');
+                if (redCanvasBtn) {
+                    redCanvasBtn.disabled = false;
                 }
             }
             
@@ -931,6 +960,8 @@ export class CameraController {
         if (mainSelect) {
             mainSelect.addEventListener('change', async (e) => {
                 if (e.target.value) {
+                    // Update the main camera device ID
+                    this.mainCameraDeviceId = e.target.value;
                     // Get capabilities for the selected camera
                     await this.getCameraCapabilities(e.target.value);
                     // Reset resolution selector when camera is changed
@@ -939,6 +970,21 @@ export class CameraController {
                         resolutionSelect.value = '';
                         this.setCameraResolution(null, null);
                     }
+                    // Save settings to localStorage
+                    this.saveAllSettings();
+                }
+            });
+        }
+        
+        // PIP camera select
+        const pipSelect = document.getElementById('pip-camera-select');
+        if (pipSelect) {
+            pipSelect.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    // Update the PIP camera device ID
+                    this.pipCameraDeviceId = e.target.value;
+                    // Save settings to localStorage
+                    this.saveAllSettings();
                 }
             });
         }
@@ -998,6 +1044,8 @@ export class CameraController {
                     this.desiredResolution = null;
                     updateStatus('main-status', 'Resolution reset to default');
                 }
+                // Save settings to localStorage
+                this.saveAllSettings();
             });
         }
         
