@@ -9,16 +9,16 @@
     <style>
         /* Custom styles for video elements that can't be handled by Tailwind */
         #main-video, #pip-video {
-            transform: scaleX(-1);
-            -webkit-transform: scaleX(-1); /* For older Safari versions */
-            -moz-transform: scaleX(-1); /* For older Firefox versions */
+            transform: none;
+            -webkit-transform: none; /* For older Safari versions */
+            -moz-transform: none; /* For older Firefox versions */
         }
         
         /* Style for detection overlay canvas */
         #detection-overlay {
-            transform: scaleX(-1);
-            -webkit-transform: scaleX(-1); /* For older Safari versions */
-            -moz-transform: scaleX(-1); /* For older Firefox versions */
+            transform: none;
+            -webkit-transform: none; /* For older Safari versions */
+            -moz-transform: none; /* For older Firefox versions */
         }
     </style>
 </head>
@@ -103,6 +103,28 @@
                             <option value="1920x1080">1920x1080 (1080p Full HD)</option>
                             <option value="3840x2160">3840x2160 (4K UHD)</option>
                         </select>
+                    </div>
+                    <!-- Transform Controls for Main Camera -->
+                    <div id="transform-controls" class="mb-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="rotation-select" class="block mb-2 font-bold text-gray-300">Rotation:</label>
+                                <select id="rotation-select" class="w-full p-2 rounded border border-gray-600 bg-gray-700 text-white" disabled>
+                                    <option value="0">0°</option>
+                                    <option value="90">90°</option>
+                                    <option value="180">180°</option>
+                                    <option value="270">270°</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="mirror-toggle" class="block mb-2 font-bold text-gray-300">Mirror:</label>
+                                <div class="flex items-center">
+                                    <button id="mirror-toggle" class="w-full p-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded transition-colors" disabled>
+                                        <span id="mirror-status">Off</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <button id="toggle-main-btn" class="w-full p-3 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -334,6 +356,9 @@
                         <div id="blood-status4">Blood Pressure: 85</div>
                         <div id="heartRate-status4">HeartRate: 82</div>
                         <div id="calorie-status4">Calories: 0</div>
+                    </div>
+                    <div id="status-overlay5" class="bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
+                        User activity description.
                     </div>
                 </div>
 

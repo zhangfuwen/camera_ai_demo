@@ -370,6 +370,19 @@ function setupCustomEventListeners() {
             app.mosaicEffectController.toggleMosaicEffect();
         }
     });
+    
+    // Rotation and mirror controls
+    document.addEventListener('setRotation', (e) => {
+        if (app.cameraController) {
+            app.cameraController.setRotation(e.detail.angle);
+        }
+    });
+    
+    document.addEventListener('toggleMirror', () => {
+        if (app.cameraController) {
+            app.cameraController.toggleMirror();
+        }
+    });
 }
 
 /**

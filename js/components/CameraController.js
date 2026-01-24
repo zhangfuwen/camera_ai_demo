@@ -19,6 +19,9 @@ export class CameraController {
         this.pipPosition = { x: 10, y: 10 };
         this.isDragging = false;
         this.dragOffset = { x: 0, y: 0 };
+        // 添加旋转和镜像状态变量
+        this.rotationAngle = 0;
+        this.isMirrored = false;
     }
 
     /**
@@ -187,6 +190,94 @@ export class CameraController {
     setCameraResolution(width, height) {
         this.desiredResolution = { width, height };
         console.log(`Camera resolution set to: ${width}x${height}`);
+    }
+
+    /**
+     * Apply transforms to video element (rotation and mirror)
+     */
+    applyTransforms() {
+        if (!this.videoElement) return;
+        
+        let transformValue = '';
+        
+        // Apply mirror effect
+        if (this.isMirrored) {
+            transformValue += 'scaleX(-1) ';
+        }
+        
+        // Apply rotation
+        if (this.rotationAngle !== 0) {
+            transformValue += `rotate(${this.rotationAngle}deg) `;
+        }
+        
+        // Apply transform to video element
+        this.videoElement.style.transform = transformValue.trim() || 'none';
+    }
+
+    /**
+     * Set rotation angle for video element
+     * @param {number} angle - Rotation angle in degrees (0, 90, 180, 270)
+     */
+    setRotation(angle) {
+        if ([0, 90, 180, 270].includes(angle)) {
+            this.rotationAngle = angle;
+            this.applyTransforms();
+            updateStatus('main-status', `Main Camera: Active - Rotation: ${angle}°`);
+        }
+    }
+
+    /**
+     * Toggle mirror effect for video element
+     */
+    toggleMirror() {
+        this.isMirrored = !this.isMirrored;
+        this.applyTransforms();
+        
+        // Update UI button text
+        const mirrorToggle = document.getElementById('mirror-toggle');
+        const mirrorStatus = document.getElementById('mirror-status');
+        if (mirrorStatus) {
+            mirrorStatus.textContent = this.isMirrored ? 'On' : 'Off';
+        }
+        
+        if (mirrorToggle) {
+            mirrorToggle.classList.toggle('bg-gray-600', !this.isMirrored);
+            mirrorToggle.classList.toggle('bg-blue-600', this.isMirrored);
+        }
+        
+        updateStatus('main-status', `Main Camera: Active - Mirror: ${this.isMirrored ? 'On' : 'Off'}`);
+    }
+
+    /**
+     * Setup transform controls event listeners
+     */
+    setupTransformControls() {
+        // Rotation select
+        const rotationSelect = document.getElementById('rotation-select');
+        if (rotationSelect) {
+            rotationSelect.addEventListener('change', (e) => {
+                const angle = parseInt(e.target.value);
+                this.setRotation(angle);
+            });
+        }
+
+        // Mirror toggle button
+        const mirrorToggle = document.getElementById('mirror-toggle');
+        if (mirrorToggle) {
+            mirrorToggle.addEventListener('click', () => {
+                this.toggleMirror();
+            });
+        }
+        
+        // Enable the transform controls when camera permission is granted
+        const transformControls = document.getElementById('transform-controls');
+        if (transformControls) {
+            const rotationSelect = document.getElementById('rotation-select');
+            const mirrorToggle = document.getElementById('mirror-toggle');
+            
+            if (rotationSelect) rotationSelect.disabled = false;
+            if (mirrorToggle) mirrorToggle.disabled = false;
+        }
     }
 
     /**
@@ -694,6 +785,9 @@ export class CameraController {
                 }
             });
         }
+        
+        // Setup transform controls (rotation and mirror)
+        this.setupTransformControls();
     }
 
     /**
