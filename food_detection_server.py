@@ -8,6 +8,8 @@ import io
 import base64
 import json
 import os
+from datetime import datetime
+import werkzeug.utils
 
 app = Flask(__name__, static_folder='.', template_folder='.')
 CORS(app)  # Enable CORS for all routes
@@ -34,6 +36,14 @@ try:
 except:
     class_names = {}  # Fallback if class names aren't available
     print("Could not retrieve class names from model")
+
+# Create upload directory for videos if it doesn't exist
+UPLOAD_FOLDER = 'recorded_videos'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+    print(f"Created upload directory: {UPLOAD_FOLDER}")
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
 
@@ -237,6 +247,95 @@ def detect_food_stream():
         app.logger.error(f"Error in detect_food_stream: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route('/upload_video', methods=['POST'])
+def upload_video():
+    """
+    Handle video file uploads and save them with timestamps.
+    
+    Expected form data:
+    - video: video file (webm format)
+    - timestamp: timestamp string from client
+    
+    Returns:
+    {
+        "success": true,
+        "filename": "saved_filename.webm",
+        "timestamp": "timestamp_string",
+        "path": "path/to/saved/file"
+    }
+    """
+    try:
+        # Log request received
+        print(f"[VIDEO UPLOAD] Request received at {datetime.now().isoformat()}")
+        print(f"[VIDEO UPLOAD] Request headers: {dict(request.headers)}")
+        print(f"[VIDEO UPLOAD] Request form data keys: {list(request.form.keys())}")
+        print(f"[VIDEO UPLOAD] Request files keys: {list(request.files.keys())}")
+        
+        # Check if video file is in the request
+        if 'video' not in request.files:
+            print(f"[VIDEO UPLOAD] ERROR: No video file in request")
+            return jsonify({"success": False, "error": "No video file provided"}), 400
+        
+        video_file = request.files['video']
+        print(f"[VIDEO UPLOAD] Video file received: {video_file.filename}")
+        print(f"[VIDEO UPLOAD] Video file content type: {video_file.content_type}")
+        
+        if video_file.filename == '':
+            print(f"[VIDEO UPLOAD] ERROR: Empty filename")
+            return jsonify({"success": False, "error": "No video file selected"}), 400
+        
+        # Get timestamp from form data or generate one
+        timestamp = request.form.get('timestamp', datetime.now().isoformat())
+        print(f"[VIDEO UPLOAD] Client timestamp: {timestamp}")
+        
+        # Secure the filename and ensure it has the correct extension
+        filename = werkzeug.utils.secure_filename(video_file.filename)
+        if not filename.lower().endswith('.webm'):
+            filename += '.webm'
+        
+        # Add timestamp prefix to ensure unique ordering
+        timestamp_prefix = timestamp.replace(':', '-').replace('.', '-')
+        saved_filename = f"{timestamp_prefix}_{filename}"
+        
+        # Save the file
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
+        print(f"[VIDEO UPLOAD] Saving file to: {file_path}")
+        
+        video_file.save(file_path)
+        
+        # Get file size for logging
+        file_size = os.path.getsize(file_path)
+        print(f"[VIDEO UPLOAD] File saved successfully: {saved_filename}")
+        print(f"[VIDEO UPLOAD] File size: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
+        print(f"[VIDEO UPLOAD] Full path: {os.path.abspath(file_path)}")
+        
+        # List files in upload directory for verification
+        try:
+            existing_files = os.listdir(app.config['UPLOAD_FOLDER'])
+            print(f"[VIDEO UPLOAD] Total files in upload directory: {len(existing_files)}")
+            if len(existing_files) <= 5:  # Only list if not too many files
+                print(f"[VIDEO UPLOAD] Files: {sorted(existing_files)}")
+        except Exception as e:
+            print(f"[VIDEO UPLOAD] Warning: Could not list directory contents: {e}")
+        
+        print(f"[VIDEO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
+        
+        return jsonify({
+            "success": True,
+            "filename": saved_filename,
+            "timestamp": timestamp,
+            "path": file_path,
+            "size": file_size
+        })
+    
+    except Exception as e:
+        print(f"[VIDEO UPLOAD] ERROR: {str(e)}")
+        print(f"[VIDEO UPLOAD] Error type: {type(e).__name__}")
+        import traceback
+        print(f"[VIDEO UPLOAD] Traceback: {traceback.format_exc()}")
+        app.logger.error(f"Error in upload_video: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/health', methods=['GET'])

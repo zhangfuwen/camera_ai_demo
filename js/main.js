@@ -13,6 +13,7 @@ import { ImageProcessingController } from './components/ImageProcessingControlle
 import { UIController } from './components/UIController.js';
 import { LLMClient } from './components/LLMClient.js';
 import { MosaicEffectController } from './components/MosaicEffectController.js';
+import { VideoRecorderController } from './components/VideoRecorderController.js';
 
 // Application state - exposed to window for component communication
 window.app = {
@@ -24,6 +25,7 @@ window.app = {
     uiController: null,
     llmClient: null,
     mosaicEffectController: null,
+    videoRecorderController: null,
     isInitialized: false
 };
 
@@ -50,6 +52,7 @@ async function init() {
         app.imageProcessingController = new ImageProcessingController();
         app.llmClient = new LLMClient();
         app.mosaicEffectController = new MosaicEffectController();
+        app.videoRecorderController = new VideoRecorderController();
         
         // Initialize components
         await initializeComponents();
@@ -103,6 +106,9 @@ async function initializeComponents() {
     
     // Initialize mosaic effect controller
     app.mosaicEffectController.initialize();
+    
+    // Initialize video recorder controller
+    app.videoRecorderController.initialize();
 }
 
 /**
@@ -269,7 +275,7 @@ function setupEventDelegation() {
             document.dispatchEvent(new CustomEvent('toggleVideoRecording'));
         }
         
-        if (target.matches('#save-video-btn')) {
+        if (target.matches('#save-recorded-video-btn')) {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('saveRecordedVideo'));
         }
