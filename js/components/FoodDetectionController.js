@@ -16,6 +16,7 @@ export class FoodDetectionController {
         this.detectionOverlay = null;
         this.lastDetectionResults = [];
         this.ctx = null;
+        this.showMasks = false;  // Track mask visibility state (default to showing only boxes)
     }
 
     /**
@@ -32,9 +33,19 @@ export class FoodDetectionController {
         this.detectionOverlay = document.getElementById('detection-overlay');
         this.mainVideo = document.getElementById('main-video');
         
+        // Get toggle mask button
+        this.toggleMaskButton = document.getElementById('toggle-mask-btn');
+        
         // Initialize canvas context
         if (this.detectionOverlay) {
             this.ctx = this.detectionOverlay.getContext('2d');
+        }
+        
+        // Add event listener for the toggle mask button
+        if (this.toggleMaskButton) {
+            this.toggleMaskButton.addEventListener('click', () => {
+                this.toggleMasks();
+            });
         }
     }
 
@@ -114,6 +125,29 @@ export class FoodDetectionController {
         
         // Clear detection overlay
         this.clearDetectionOverlay();
+    }
+    
+    /**
+     * Toggle mask visibility
+     */
+    toggleMasks() {
+        this.showMasks = !this.showMasks;
+        
+        // Update button text
+        if (this.toggleMaskButton) {
+            this.toggleMaskButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                ${this.showMasks ? 'Hide Masks' : 'Show Masks'}
+            `;
+        }
+        
+        // Redraw detections with updated mask visibility
+        if (this.lastDetectionResults && this.lastDetectionResults.length > 0) {
+            this.drawDetections(this.lastDetectionResults);
+        }
     }
 
     /**
@@ -298,8 +332,8 @@ export class FoodDetectionController {
             const width = box.xmax - box.xmin;
             const height = box.ymax - box.ymin;
             
-            // Draw segmentation mask if available
-            if (mask && mask.length > 0) {
+            // Draw segmentation mask if available and enabled
+            if (mask && mask.length > 0 && this.showMasks) {
                 // Create a temporary canvas for the mask
                 const maskCanvas = document.createElement('canvas');
                 const maskCtx = maskCanvas.getContext('2d');
