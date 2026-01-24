@@ -1,0 +1,6 @@
+pyproject.toml
+camera_ai_demo.egg-info/PKG-INFO
+camera_ai_demo.egg-info/SOURCES.txt
+camera_ai_demo.egg-info/dependency_links.txt
+camera_ai_demo.egg-info/top_level.txt
+food_detection_training/train_food_model.py

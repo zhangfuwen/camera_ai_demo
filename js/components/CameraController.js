@@ -58,9 +58,23 @@ export class CameraController {
      */
     async initialize(videoElement) {
         this.videoElement = videoElement;
-        await this.getCameraDevices();
-        await this.startCamera();
+        
+        // Set up event listeners
         this.setupEventListeners();
+        
+        // Set up UI controls
+        this.setupTransformControls();
+        this.setupColorAdjustmentControls();
+        
+        // Initialize rotation and mirror states
+        this.rotationAngle = 0;
+        this.isMirrored = false;
+        
+        // Load all saved camera settings from local storage
+        this.loadAllSettings();
+        
+        // Initialize camera
+        await this.startCamera();
     }
 
     /**
@@ -229,6 +243,7 @@ export class CameraController {
         if ([0, 90, 180, 270].includes(angle)) {
             this.rotationAngle = angle;
             this.applyTransforms();
+            this.saveAllSettings();
             updateStatus('main-status', `Main Camera: Active - Rotation: ${angle}°`);
         }
     }
@@ -239,6 +254,7 @@ export class CameraController {
     toggleMirror() {
         this.isMirrored = !this.isMirrored;
         this.applyTransforms();
+        this.saveAllSettings();
         
         // Update UI button text
         const mirrorToggle = document.getElementById('mirror-toggle');
@@ -720,13 +736,20 @@ export class CameraController {
             this.pipVideoContainer.style.visibility = 'hidden';
             this.pipVideoContainer.style.opacity = '0';
             updateStatus('pip-status', 'PIP Camera: Hidden');
+            // Update the pipVisible state
+            this.pipVisible = false;
         } else {
             // Show the PIP container
             this.pipVideoContainer.style.display = 'block';
             this.pipVideoContainer.style.visibility = 'visible';
             this.pipVideoContainer.style.opacity = '1';
             updateStatus('pip-status', 'PIP Camera: Visible');
+            // Update the pipVisible state
+            this.pipVisible = true;
         }
+        
+        // Save the updated PIP visibility state
+        this.saveAllSettings();
     }
     
     /**
@@ -771,6 +794,8 @@ export class CameraController {
                 `;
                 updateStatus('pip-status', 'PIP Camera: Hidden');
             }
+            // Update the pipVisible state
+            this.pipVisible = false;
         } else {
             console.log('Showing PIP container');
             this.pipVideoContainer.style.display = 'block';
@@ -790,8 +815,13 @@ export class CameraController {
                 `;
                 updateStatus('pip-status', 'PIP Camera: Visible');
             }
+            // Update the pipVisible state
+            this.pipVisible = true;
         }
         console.log('togglePipView completed');
+        
+        // Save the updated PIP visibility state
+        this.saveAllSettings();
     }
 
     /**
@@ -1206,6 +1236,138 @@ export class CameraController {
         
         // Apply the combined CSS filters to the video element
         this.videoElement.style.filter = filterString.trim();
+        
+        // Save current adjustments to local storage
+        this.saveAllSettings();
+    }
+    
+    /**
+     * Save all camera settings to local storage
+     */
+    saveAllSettings() {
+        const settings = {
+            // Color adjustments
+            brightness: this.brightness,
+            contrast: this.contrast,
+            saturation: this.saturation,
+            redChannel: this.redChannel,
+            greenChannel: this.greenChannel,
+            blueChannel: this.blueChannel,
+            
+            // Transform settings
+            rotationAngle: this.rotationAngle,
+            isMirrored: this.isMirrored,
+            
+            // PIP settings
+            pipVisible: this.pipVisible
+        };
+        
+        localStorage.setItem('cameraSettings', JSON.stringify(settings));
+    }
+    
+    /**
+     * Load all camera settings from local storage
+     */
+    loadAllSettings() {
+        try {
+            const savedSettings = localStorage.getItem('cameraSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                
+                // Load color adjustments
+                this.brightness = settings.brightness !== undefined ? settings.brightness : 100;
+                this.contrast = settings.contrast !== undefined ? settings.contrast : 100;
+                this.saturation = settings.saturation !== undefined ? settings.saturation : 100;
+                this.redChannel = settings.redChannel !== undefined ? settings.redChannel : 100;
+                this.greenChannel = settings.greenChannel !== undefined ? settings.greenChannel : 100;
+                this.blueChannel = settings.blueChannel !== undefined ? settings.blueChannel : 100;
+                
+                // Load transform settings
+                this.rotationAngle = settings.rotationAngle !== undefined ? settings.rotationAngle : 0;
+                this.isMirrored = settings.isMirrored !== undefined ? settings.isMirrored : false;
+                
+                // Load PIP settings
+                this.pipVisible = settings.pipVisible !== undefined ? settings.pipVisible : false;
+                
+                // Update the UI sliders to reflect loaded values
+                this.updateColorSliderValues();
+                
+                // Apply the loaded transforms
+                this.applyTransforms();
+                
+                // Apply the loaded PIP visibility state
+                if (this.pipVideoElement) {
+                    this.togglePipView();
+                }
+                
+                return true;
+            }
+        } catch (error) {
+            console.error('Error loading camera settings from local storage:', error);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Load color adjustments from local storage
+     */
+    loadColorAdjustments() {
+        try {
+            const savedAdjustments = localStorage.getItem('cameraColorAdjustments');
+            if (savedAdjustments) {
+                const adjustments = JSON.parse(savedAdjustments);
+                
+                this.brightness = adjustments.brightness !== undefined ? adjustments.brightness : 100;
+                this.contrast = adjustments.contrast !== undefined ? adjustments.contrast : 100;
+                this.saturation = adjustments.saturation !== undefined ? adjustments.saturation : 100;
+                this.redChannel = adjustments.redChannel !== undefined ? adjustments.redChannel : 100;
+                this.greenChannel = adjustments.greenChannel !== undefined ? adjustments.greenChannel : 100;
+                this.blueChannel = adjustments.blueChannel !== undefined ? adjustments.blueChannel : 100;
+                
+                // Update the UI sliders to reflect loaded values
+                this.updateColorSliderValues();
+                
+                return true;
+            }
+        } catch (error) {
+            console.error('Error loading color adjustments from local storage:', error);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Update the color slider values in the UI to match stored values
+     */
+    updateColorSliderValues() {
+        const brightnessSlider = document.getElementById('brightness-slider');
+        const contrastSlider = document.getElementById('contrast-slider');
+        const saturationSlider = document.getElementById('saturation-slider');
+        const redChannelSlider = document.getElementById('red-channel-slider');
+        const greenChannelSlider = document.getElementById('green-channel-slider');
+        const blueChannelSlider = document.getElementById('blue-channel-slider');
+        
+        const brightnessValueDisplay = document.getElementById('brightness-value');
+        const contrastValueDisplay = document.getElementById('contrast-value');
+        const saturationValueDisplay = document.getElementById('saturation-value');
+        const redValueDisplay = document.getElementById('red-channel-value');
+        const greenValueDisplay = document.getElementById('green-channel-value');
+        const blueValueDisplay = document.getElementById('blue-channel-value');
+        
+        if (brightnessSlider) brightnessSlider.value = this.brightness;
+        if (contrastSlider) contrastSlider.value = this.contrast;
+        if (saturationSlider) saturationSlider.value = this.saturation;
+        if (redChannelSlider) redChannelSlider.value = this.redChannel;
+        if (greenChannelSlider) greenChannelSlider.value = this.greenChannel;
+        if (blueChannelSlider) blueChannelSlider.value = this.blueChannel;
+        
+        if (brightnessValueDisplay) brightnessValueDisplay.textContent = `${this.brightness}%`;
+        if (contrastValueDisplay) contrastValueDisplay.textContent = `${this.contrast}%`;
+        if (saturationValueDisplay) saturationValueDisplay.textContent = `${this.saturation}%`;
+        if (redValueDisplay) redValueDisplay.textContent = `${this.redChannel}%`;
+        if (greenValueDisplay) greenValueDisplay.textContent = `${this.greenChannel}%`;
+        if (blueValueDisplay) blueValueDisplay.textContent = `${this.blueChannel}%`;
     }
 
     /**
