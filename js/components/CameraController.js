@@ -14,6 +14,8 @@ export class CameraController {
         this.isRecording = false;
         this.devices = [];
         this.currentDeviceId = null;
+        this.mainCameraDeviceId = null;
+        this.pipCameraDeviceId = null;
         this.pipVideo = null;
         this.pipVideoContainer = null;
         this.pipPosition = { x: 10, y: 10 };
@@ -29,6 +31,8 @@ export class CameraController {
         this.redChannel = 100;
         this.greenChannel = 100;
         this.blueChannel = 100;
+        // Resolution settings
+        this.desiredResolution = null;
     }
 
     /**
@@ -310,13 +314,30 @@ export class CameraController {
     async startCamera(type = 'main') {
         try {
             // Get selected device ID
+            let deviceId = null;
             const selectElement = document.getElementById(type === 'main' ? 'main-camera-select' : 'pip-camera-select');
-            if (!selectElement || !selectElement.value) {
+            
+            // First, try to get the device ID from the dropdown selection
+            if (selectElement && selectElement.value) {
+                deviceId = selectElement.value;
+            } else {
+                // If no selection is made, try to use the saved camera selection
+                if (type === 'main') {
+                    deviceId = this.mainCameraDeviceId;
+                } else {
+                    deviceId = this.pipCameraDeviceId;
+                }
+                
+                // If we have a saved device ID, set it in the dropdown
+                if (deviceId && selectElement) {
+                    selectElement.value = deviceId;
+                }
+            }
+            
+            if (!deviceId) {
                 updateStatus(`${type}-status`, `Error: No camera selected`);
                 return;
             }
-            
-            const deviceId = selectElement.value;
             
             // Stop existing stream if it exists
             if (type === 'main' && this.stream) {
@@ -386,8 +407,9 @@ export class CameraController {
                     window.app.mosaicEffectController.initialize(this.videoElement);
                 }
                 
-                // Apply transforms after camera starts
+                // Apply transforms and color adjustments after camera starts
                 this.applyTransforms();
+                this.applyColorAdjustments();
             } else {
                 this.pipStream = stream;
                 if (!this.pipVideo) {
@@ -959,9 +981,13 @@ export class CameraController {
                 if (value) {
                     const [width, height] = value.split('x').map(Number);
                     this.setCameraResolution(width, height);
+                    // Update the desired resolution property for saving
+                    this.desiredResolution = { width, height };
                     updateStatus('main-status', `Resolution set to ${width}x${height}`);
                 } else {
                     this.setCameraResolution(null, null);
+                    // Reset the desired resolution property
+                    this.desiredResolution = null;
                     updateStatus('main-status', 'Resolution reset to default');
                 }
             });
@@ -1059,6 +1085,15 @@ export class CameraController {
             pipOption.textContent = this.getCameraLabel(device);
             pipCameraSelect.appendChild(pipOption);
         });
+        
+        // After populating, set the saved selections if they exist
+        if (this.mainCameraDeviceId && mainCameraSelect.querySelector(`option[value="${this.mainCameraDeviceId}"]`)) {
+            mainCameraSelect.value = this.mainCameraDeviceId;
+        }
+        
+        if (this.pipCameraDeviceId && pipCameraSelect.querySelector(`option[value="${this.pipCameraDeviceId}"]`)) {
+            pipCameraSelect.value = this.pipCameraDeviceId;
+        }
     }
     
     /**
@@ -1290,9 +1325,6 @@ export class CameraController {
         
         // Apply the combined CSS filters to the video element
         this.videoElement.style.filter = filterString.trim();
-        
-        // Save current adjustments to local storage
-        this.saveAllSettings();
     }
     
     /**
@@ -1313,7 +1345,15 @@ export class CameraController {
             isMirrored: this.isMirrored,
             
             // PIP settings
-            pipVisible: this.pipVisible
+            pipVisible: this.pipVisible,
+            
+            // Camera selections
+            mainCameraDeviceId: this.mainCameraDeviceId,
+            pipCameraDeviceId: this.pipCameraDeviceId,
+            currentDeviceId: this.currentDeviceId,
+            
+            // Resolution settings - save as string format "WIDTHxHEIGHT" to match UI
+            desiredResolution: this.desiredResolution ? `${this.desiredResolution.width}x${this.desiredResolution.height}` : null
         };
         
         localStorage.setItem('cameraSettings', JSON.stringify(settings));
@@ -1343,6 +1383,32 @@ export class CameraController {
                 // Load PIP settings
                 this.pipVisible = settings.pipVisible !== undefined ? settings.pipVisible : false;
                 
+                // Load camera selections
+                this.mainCameraDeviceId = settings.mainCameraDeviceId !== undefined ? settings.mainCameraDeviceId : null;
+                this.pipCameraDeviceId = settings.pipCameraDeviceId !== undefined ? settings.pipCameraDeviceId : null;
+                this.currentDeviceId = settings.currentDeviceId !== undefined ? settings.currentDeviceId : null;
+                
+                // Load resolution settings - convert string format "WIDTHxHEIGHT" back to object format
+                if (settings.desiredResolution) {
+                    if (typeof settings.desiredResolution === 'string') {
+                        // Parse string format like "1920x1080"
+                        const [widthStr, heightStr] = settings.desiredResolution.split('x');
+                        if (widthStr && heightStr) {
+                            this.desiredResolution = {
+                                width: parseInt(widthStr),
+                                height: parseInt(heightStr)
+                            };
+                        } else {
+                            this.desiredResolution = null;
+                        }
+                    } else {
+                        // Already in object format
+                        this.desiredResolution = settings.desiredResolution;
+                    }
+                } else {
+                    this.desiredResolution = null;
+                }
+                
                 // Update the UI sliders to reflect loaded values
                 this.updateColorSliderValues();
                 
@@ -1352,6 +1418,23 @@ export class CameraController {
                 // Apply the loaded transforms if video element is ready
                 if (this.videoElement && this.stream) {
                     this.applyTransforms();
+                    // Use a slight delay to ensure the video element is properly initialized before applying color adjustments
+                    setTimeout(() => {
+                        this.applyColorAdjustments();
+                    }, 100);
+                }
+                
+                // Update resolution selection in UI if resolution was loaded
+                if (this.desiredResolution) {
+                    const resolutionSelect = document.getElementById('resolution-select');
+                    if (resolutionSelect && resolutionSelect.querySelector(`option[value="${this.desiredResolution.width}x${this.desiredResolution.height}"]`)) {
+                        resolutionSelect.value = `${this.desiredResolution.width}x${this.desiredResolution.height}`;
+                    }
+                    
+                    // If camera is already running, apply the resolution
+                    if (this.videoElement && this.stream) {
+                        this.setCameraResolution(this.desiredResolution.width, this.desiredResolution.height);
+                    }
                 }
                 
                 // Apply the loaded PIP visibility state by ensuring the container visibility matches the saved state
@@ -1362,6 +1445,9 @@ export class CameraController {
                         // Update the UI to match the saved state
                         this.updatePipUI();
                     }
+                    
+                    // Update camera selection dropdowns to reflect loaded values after DOM is ready
+                    this.updateCameraSelectionUI();
                 }, 100); // Small delay to ensure UI is ready
                 
                 return true;
@@ -1456,6 +1542,38 @@ export class CameraController {
         if (redValueDisplay) redValueDisplay.textContent = `${this.redChannel}%`;
         if (greenValueDisplay) greenValueDisplay.textContent = `${this.greenChannel}%`;
         if (blueValueDisplay) blueValueDisplay.textContent = `${this.blueChannel}%`;
+    }
+
+    /**
+     * Update camera selection UI to reflect loaded values
+     */
+    updateCameraSelectionUI() {
+        // Update main camera selection dropdown
+        const mainCameraSelect = document.getElementById('main-camera-select');
+        if (mainCameraSelect && this.mainCameraDeviceId) {
+            // Wait for options to be populated, then set the value
+            setTimeout(() => {
+                mainCameraSelect.value = this.mainCameraDeviceId;
+            }, 100);
+        }
+        
+        // Update PIP camera selection dropdown
+        const pipCameraSelect = document.getElementById('pip-camera-select');
+        if (pipCameraSelect && this.pipCameraDeviceId) {
+            // Wait for options to be populated, then set the value
+            setTimeout(() => {
+                pipCameraSelect.value = this.pipCameraDeviceId;
+            }, 100);
+        }
+        
+        // Update resolution selection dropdown
+        const resolutionSelect = document.getElementById('resolution-select');
+        if (resolutionSelect && this.desiredResolution) {
+            // Wait for options to be populated, then set the value
+            setTimeout(() => {
+                resolutionSelect.value = `${this.desiredResolution.width}x${this.desiredResolution.height}`;
+            }, 100);
+        }
     }
 
     /**
