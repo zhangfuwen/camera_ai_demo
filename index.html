@@ -6,6 +6,8 @@
     <title>Camera AI Demo with Food Detection</title>
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Socket.IO client library -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         /* Custom styles for video elements that can't be handled by Tailwind */
         #main-video, #pip-video {
@@ -426,6 +428,7 @@
                     <div id="blood-status">Blood Pressure: 85</div>
                     <div id="heartRate-status">HeartRate: 82</div>
                     <div id="calorie-status">Calories: 0</div>
+                    <div id="stream-connection-status" class="text-xs px-2 py-1 rounded bg-gray-600 text-white mt-2">Stream: Disconnected</div>
                 </div>
                 <div id="status-overlay2" class="bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
                     <div id="main-status2" class="mb-1">Main Camera: Not Active</div>

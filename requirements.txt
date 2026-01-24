@@ -11,3 +11,4 @@ huggingface-hub>=0.14.0
 timm>=1.0.24
 ultralytics>=8.0.0
 flask-cors
+flask-socketio

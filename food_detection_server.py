@@ -10,9 +10,27 @@ import json
 import os
 from datetime import datetime
 import werkzeug.utils
+import threading
+import time
+import random
+import asyncio
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__, static_folder='.', template_folder='.')
 CORS(app)  # Enable CORS for all routes
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Global data storage for streaming
+stream_data = {
+    'sensor_values': {},
+    'user_emotions': {},
+    'audio_detections': [],
+    'video_detections': [],
+    'overall_status': {}
+}
+
+# Connected clients
+connected_clients = set()
 
 # Load the trained food detection model
 # First try to load the trained model from the training directory
@@ -328,6 +346,11 @@ def upload_video():
         
         print(f"[VIDEO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
         
+        # Trigger Gemini video analysis in background
+        gemini_thread = threading.Thread(target=run_gemini_video_analysis, args=(file_path,), daemon=True)
+        gemini_thread.start()
+        print(f"[GEMINI] Started video analysis for: {saved_filename}")
+        
         return jsonify({
             "success": True,
             "filename": saved_filename,
@@ -418,6 +441,11 @@ def upload_audio():
         
         print(f"[AUDIO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
         
+        # Trigger Gemini audio analysis in background
+        gemini_thread = threading.Thread(target=run_gemini_audio_analysis, args=(file_path,), daemon=True)
+        gemini_thread.start()
+        print(f"[GEMINI] Started audio analysis for: {saved_filename}")
+        
         return jsonify({
             "success": True,
             "filename": saved_filename,
@@ -455,6 +483,234 @@ def get_classes():
         return jsonify({'error': str(e)}), 500
 
 
+# WebSocket events
+@socketio.on('connect')
+def handle_connect():
+    print(f'[STREAM] Client connected: {request.sid}')
+    connected_clients.add(request.sid)
+    emit('status', {'message': 'Connected to stream'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print(f'[STREAM] Client disconnected: {request.sid}')
+    connected_clients.discard(request.sid)
+
+@socketio.on('heartbeat')
+def handle_heartbeat():
+    emit('heartbeat_response', {'timestamp': datetime.now().isoformat()})
+
+def broadcast_to_clients(message_type, content):
+    """Broadcast message to all connected clients"""
+    if connected_clients:
+        message = {
+            'type': message_type,
+            'content': content,
+            'timestamp': datetime.now().isoformat()
+        }
+        socketio.emit('stream_update', message)
+        print(f'[STREAM] Broadcasted {message_type} to {len(connected_clients)} clients')
+
+def generate_sensor_data():
+    """Generate fake sensor data like from a sport watch"""
+    return {
+        'energy': random.randint(20, 100),
+        'sleep': f"{random.uniform(6, 9):.2f} Hours",
+        'sport': f"{random.randint(1000, 15000)} Steps",
+        'blood': f"{random.randint(70, 120)}",
+        'heartRate': f"{random.randint(60, 100)}",
+        'calories': f"{random.randint(200, 800)}"
+    }
+
+def generate_sensor_html():
+    """Generate HTML for sensor values"""
+    data = generate_sensor_data()
+    return f"""
+    <div class="text-green-500">
+        <div>Energy: {data['energy']}</div>
+        <div>Sleep: {data['sleep']}</div>
+        <div>Sport: {data['sport']}</div>
+        <div>Blood Pressure: {data['blood']}</div>
+        <div>HeartRate: {data['heartRate']}</div>
+        <div>Calories: {data['calories']}</div>
+    </div>
+    """
+
+def generate_emotion_html():
+    """Generate HTML for user emotions"""
+    emotions = ['Happy', 'Focused', 'Neutral', 'Relaxed', 'Concentrated', 'Thoughtful']
+    emotion = random.choice(emotions)
+    confidence = random.uniform(0.7, 0.95)
+    return f"""
+    <div class="text-green-500">
+        <div>Emotion: {emotion}</div>
+        <div>Confidence: {confidence:.2f}</div>
+        <div>Detected: {datetime.now().strftime('%H:%M:%S')}</div>
+    </div>
+    """
+
+def generate_audio_detection_html():
+    """Generate HTML for audio detection results"""
+    activities = ['Speaking', 'Silent', 'Background noise', 'Conversation', 'Typing']
+    activity = random.choice(activities)
+    volume = random.randint(20, 80)
+    return f"""
+    <div class="text-green-500">
+        <div>Activity: {activity}</div>
+        <div>Volume: {volume} dB</div>
+        <div>Duration: {random.randint(1, 10)}s</div>
+    </div>
+    """
+
+def generate_video_detection_html():
+    """Generate HTML for video detection results"""
+    activities = ['Working at computer', 'Looking at screen', 'Typing', 'Reading', 'Writing notes']
+    activity = random.choice(activities)
+    objects = ['person', 'computer', 'keyboard', 'mouse', 'cup']
+    detected_objects = random.sample(objects, random.randint(1, 3))
+    return f"""
+    <div class="text-green-500">
+        <div>Activity: {activity}</div>
+        <div>Objects: {', '.join(detected_objects)}</div>
+        <div>Movement: {random.choice(['Low', 'Medium', 'High'])}</div>
+    </div>
+    """
+
+def generate_overall_status_html():
+    """Generate HTML for overall user status"""
+    statuses = [
+        'User is actively working and focused',
+        'User appears to be in a productive state',
+        'User is engaged in computer-based activities',
+        'User shows normal work patterns',
+        'User is maintaining consistent activity levels'
+    ]
+    status = random.choice(statuses)
+    return f"""
+    <div class="text-green-500">
+        <div><strong>Overall Status:</strong></div>
+        <div>{status}</div>
+        <div class="text-xs mt-1">Updated: {datetime.now().strftime('%H:%M:%S')}</div>
+    </div>
+    """
+
+def sensor_update_timer():
+    """Timer for updating sensor values every 1 second"""
+    while True:
+        try:
+            html_content = generate_sensor_html()
+            broadcast_to_clients('sensor_update', html_content)
+            time.sleep(1)
+        except Exception as e:
+            print(f'[STREAM] Error in sensor timer: {e}')
+            time.sleep(1)
+
+def emotion_update_timer():
+    """Timer for updating emotions every 3 seconds"""
+    while True:
+        try:
+            html_content = generate_emotion_html()
+            broadcast_to_clients('emotion_update', html_content)
+            time.sleep(3)
+        except Exception as e:
+            print(f'[STREAM] Error in emotion timer: {e}')
+            time.sleep(3)
+
+def overall_status_timer():
+    """Timer for updating overall status every 20 seconds"""
+    while True:
+        try:
+            html_content = generate_overall_status_html()
+            broadcast_to_clients('overall_status', html_content)
+            time.sleep(20)
+        except Exception as e:
+            print(f'[STREAM] Error in overall status timer: {e}')
+            time.sleep(20)
+
+async def analyze_video_with_gemini(video_path):
+    """Analyze video using Gemini model"""
+    try:
+        # This is a placeholder for Gemini integration
+        # In real implementation, you would use Google's Gemini API
+        print(f'[GEMINI] Analyzing video: {video_path}')
+        
+        # Simulate API call delay
+        await asyncio.sleep(2)
+        
+        # Generate mock analysis results
+        html_content = generate_video_detection_html()
+        broadcast_to_clients('video_detect', html_content)
+        
+        # Generate emotion analysis
+        emotion_html = generate_emotion_html()
+        broadcast_to_clients('emotion_update', emotion_html)
+        
+        print(f'[GEMINI] Video analysis completed for: {video_path}')
+        
+    except Exception as e:
+        print(f'[GEMINI] Error analyzing video: {e}')
+
+async def analyze_audio_with_gemini(audio_path):
+    """Analyze audio using Gemini model"""
+    try:
+        # This is a placeholder for Gemini integration
+        # In real implementation, you would use Google's Gemini API
+        print(f'[GEMINI] Analyzing audio: {audio_path}')
+        
+        # Simulate API call delay
+        await asyncio.sleep(1.5)
+        
+        # Generate mock analysis results
+        html_content = generate_audio_detection_html()
+        broadcast_to_clients('audio_detect', html_content)
+        
+        print(f'[GEMINI] Audio analysis completed for: {audio_path}')
+        
+    except Exception as e:
+        print(f'[GEMINI] Error analyzing audio: {e}')
+
+def run_gemini_video_analysis(video_path):
+    """Run video analysis in async context"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(analyze_video_with_gemini(video_path))
+    finally:
+        loop.close()
+
+def run_gemini_audio_analysis(audio_path):
+    """Run audio analysis in async context"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(analyze_audio_with_gemini(audio_path))
+    finally:
+        loop.close()
+
+
+# Start background timers
+def start_background_timers():
+    """Start all background timer threads"""
+    # Sensor values timer (1 second)
+    sensor_thread = threading.Thread(target=sensor_update_timer, daemon=True)
+    sensor_thread.start()
+    print('[STREAM] Started sensor update timer (1s)')
+
+    # Emotion update timer (3 seconds)
+    emotion_thread = threading.Thread(target=emotion_update_timer, daemon=True)
+    emotion_thread.start()
+    print('[STREAM] Started emotion update timer (3s)')
+
+    # Overall status timer (20 seconds)
+    status_thread = threading.Thread(target=overall_status_timer, daemon=True)
+    status_thread.start()
+    print('[STREAM] Started overall status timer (20s)')
+
+
 if __name__ == '__main__':
-    print("Starting YOLO food detection server...")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    print("Starting YOLO food detection server with streaming...")
+    
+    # Start background timers
+    start_background_timers()
+    
+    # Run the app with SocketIO
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)

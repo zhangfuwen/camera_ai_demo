@@ -15,6 +15,7 @@ import { LLMClient } from './components/LLMClient.js';
 import { MosaicEffectController } from './components/MosaicEffectController.js';
 import { VideoRecorderController } from './components/VideoRecorderController.js';
 import { AudioRecorderController } from './components/AudioRecorderController.js';
+import { StreamController } from './components/StreamController.js';
 
 // Application state - exposed to window for component communication
 window.app = {
@@ -28,6 +29,7 @@ window.app = {
     mosaicEffectController: null,
     videoRecorderController: null,
     audioRecorderController: null,
+    streamController: null,
     isInitialized: false
 };
 
@@ -56,6 +58,7 @@ async function init() {
         app.mosaicEffectController = new MosaicEffectController();
         app.videoRecorderController = new VideoRecorderController();
         app.audioRecorderController = new AudioRecorderController();
+        app.streamController = new StreamController();
         
         // Initialize components
         await initializeComponents();
@@ -115,6 +118,9 @@ async function initializeComponents() {
     
     // Initialize audio recorder controller
     app.audioRecorderController.initialize();
+    
+    // Initialize stream controller
+    app.streamController.initialize();
 }
 
 /**
