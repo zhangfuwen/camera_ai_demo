@@ -89,6 +89,24 @@
                 opacity: 1;
             }
         }
+        
+        /* Toggle switch styles */
+        #flip-animation-toggle:checked ~ .dot {
+            transform: translateX(1.5rem);
+            background-color: #22c55e;
+        }
+        
+        #flip-animation-toggle:checked ~ .block {
+            background-color: #22c55e;
+        }
+        
+        .dot {
+            transition: all 0.3s ease;
+        }
+        
+        .block {
+            transition: background-color 0.3s ease;
+        }
     </style>
 </head>
 <body class="h-screen overflow-hidden bg-gray-900 text-white">
@@ -341,6 +359,36 @@
                 </div>
             </div>
 
+            <!-- Display Settings Section -->
+            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
+                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
+                    <span>Display Settings</span>
+                    <span class="accordion-icon">+</span>
+                </button>
+                <div class="accordion-content bg-gray-800 p-4 hidden">
+                    <div class="mb-4">
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="font-bold text-gray-300">Flip Animation</span>
+                            <div class="relative">
+                                <input type="checkbox" id="flip-animation-toggle" class="sr-only" checked>
+                                <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform translate-x-6"></div>
+                            </div>
+                        </label>
+                        <p class="text-xs text-gray-400 mt-2">Enable flip animation when status overlays are updated</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block mb-2 font-bold text-gray-300">Animation Style:</label>
+                        <select id="animation-style-select" class="w-full p-2 rounded border border-gray-600 bg-gray-700 text-white">
+                            <option value="card-flip">Card Flip</option>
+                            <option value="y-flip">Y-Axis Flip</option>
+                            <option value="pulse">Pulse</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <!-- Calorie Estimation Section -->
             <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
                 <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
@@ -502,36 +550,26 @@
                     <div id="pip-status2" class="mb-1">PIP Camera: Not Active</div>
                     <div id="camera-label2">Camera: Not Selected</div>
                     <div id="energy-status2">Energy: 0</div>
-                    <div id="sleep-status2">Sleep: 7.23 Hours</div>
-                    <div id="sport-status2">Steps: 3450</div>
-                    <div id="blood-status2">Blood Pressure: 85</div>
                     <div id="heartRate-status2">HeartRate: 82</div>
-                    <div id="calorie-status2">Calories: 0</div>
                 </div>
                     <div id="status-overlay3" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
                         <div id="main-status3" class="mb-1">Main Camera: Not Active</div>
                         <div id="pip-status3" class="mb-1">PIP Camera: Not Active</div>
                         <div id="camera-label3">Camera: Not Selected</div>
-                        <div id="energy-status3">Energy: 0</div>
                         <div id="sleep-status3">Sleep: 7.23 Hours</div>
                         <div id="sport-status3">Steps: 3450</div>
-                        <div id="blood-status3">Blood Pressure: 85</div>
-                        <div id="heartRate-status3">HeartRate: 82</div>
-                        <div id="calorie-status3">Calories: 0</div>
                     </div>
                     <div id="status-overlay4" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
                         <div id="main-status4" class="mb-1">Main Camera: Not Active</div>
                         <div id="pip-status4" class="mb-1">PIP Camera: Not Active</div>
                         <div id="camera-label4">Camera: Not Selected</div>
-                        <div id="energy-status4">Energy: 0</div>
-                        <div id="sleep-status4">Sleep: 7.23 Hours</div>
-                        <div id="sport-status4">Steps: 3450</div>
                         <div id="blood-status4">Blood Pressure: 85</div>
-                        <div id="heartRate-status4">HeartRate: 82</div>
                         <div id="calorie-status4">Calories: 0</div>
                     </div>
                     <div id="status-overlay5" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
-                        User activity description.
+                        <div id="activity-status5">Activity: Monitoring</div>
+                        <div id="emotion-status5">Emotion: Neutral</div>
+                        <div id="time-status5">Time: --:--:--</div>
                     </div>
                 </div>
 

@@ -750,7 +750,7 @@ async def analyze_video_with_gemini(video_path):
 3. **环境与活动**：
    - 当前主要活动
    - 环境描述
-   - 检测到的关键对象
+   - 饮食状况与Calorie与健康
 
 4. **综合情绪评估**：
    - 整体心理状态
@@ -934,7 +934,7 @@ async def generate_comprehensive_summary():
    - 工作效率建议
    - 情绪管理建议
 
-请用结构化的中文回答，每个部分详细分析并提供具体建议。"""
+请用结构化的中文回答，每个部分详细分析并提供具体建议。每个部分只输出一句简短描述。"""
 
         # Generate summary using Gemini
         response = gemini_client.chat.completions.create(
