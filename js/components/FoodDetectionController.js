@@ -257,46 +257,79 @@ export class FoodDetectionController {
             return;
         }
         
-        // Set canvas size to match source resolution
-        this.detectionOverlay.width = sourceWidth;
-        this.detectionOverlay.height = sourceHeight;
+        // Get the video container and video element
+        const videoContainer = sourceElement.parentElement;
+        const containerRect = videoContainer.getBoundingClientRect();
+        const videoRect = sourceElement.getBoundingClientRect();
         
-        // Set canvas display size to match the source element's display size
-        const sourceRect = sourceElement.getBoundingClientRect();
-        this.detectionOverlay.style.width = `${sourceRect.width}px`;
-        this.detectionOverlay.style.height = `${sourceRect.height}px`;
+        // Set canvas size to match the container (same as video w-full h-full)
+        this.detectionOverlay.width = containerRect.width;
+        this.detectionOverlay.height = containerRect.height;
+        
+        // Set canvas display size to match container exactly
+        this.detectionOverlay.style.width = `${containerRect.width}px`;
+        this.detectionOverlay.style.height = `${containerRect.height}px`;
+
+        // Position the overlay exactly on top of the video container
+        this.detectionOverlay.style.position = 'absolute';
+        this.detectionOverlay.style.top = '0';
+        this.detectionOverlay.style.left = '0';
+        this.detectionOverlay.style.pointerEvents = 'none';
 
         // Clear previous drawings
         this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
 
-        // Calculate aspect ratios for proper positioning (same as video display)
-        const sourceAspect = sourceWidth / sourceHeight;
-        const displayAspect = sourceRect.width / sourceRect.height;
+        // Calculate how the video is displayed within its container using object-contain logic
+        // object-contain: scales the video to maintain aspect ratio while fitting within container
+        const videoAspect = sourceWidth / sourceHeight;
+        const containerAspect = containerRect.width / containerRect.height;
         
-        let drawWidth, drawHeight, offsetX, offsetY;
+        let videoDisplayWidth, videoDisplayHeight, videoOffsetX, videoOffsetY;
         
-        if (displayAspect > sourceAspect) {
-            // Pillarboxed (black bars on sides)
-            drawHeight = sourceRect.height;
-            drawWidth = sourceRect.height * sourceAspect;
-            offsetX = (sourceRect.width - drawWidth) / 2;
-            offsetY = 0;
+        if (videoAspect > containerAspect) {
+            // Video is wider than container - fits to width, pillarboxing on sides
+            videoDisplayWidth = containerRect.width;
+            videoDisplayHeight = containerRect.width / videoAspect;
+            videoOffsetX = 0;
+            videoOffsetY = (containerRect.height - videoDisplayHeight) / 2;
         } else {
-            // Letterboxed (black bars on top/bottom)
-            drawWidth = sourceRect.width;
-            drawHeight = sourceRect.width / sourceAspect;
-            offsetX = 0;
-            offsetY = (sourceRect.height - drawHeight) / 2;
+            // Video is taller than container - fits to height, letterboxing on top/bottom
+            videoDisplayWidth = containerRect.height * videoAspect;
+            videoDisplayHeight = containerRect.height;
+            videoOffsetX = (containerRect.width - videoDisplayWidth) / 2;
+            videoOffsetY = 0;
         }
         
-        // Scale to account for the difference between source resolution and display size
-        const scaleX = drawWidth / sourceWidth;
-        const scaleY = drawHeight / sourceHeight;
+        // Calculate scaling factors from source resolution to displayed video area
+        const scaleX = videoDisplayWidth / sourceWidth;
+        const scaleY = videoDisplayHeight / sourceHeight;
         
-        // Apply scaling transformation directly to the context to match video display
+        // Debug logging
+        console.log('Detection overlay alignment (object-contain):', {
+            sourceWidth,
+            sourceHeight,
+            containerWidth: containerRect.width,
+            containerHeight: containerRect.height,
+            videoDisplayWidth,
+            videoDisplayHeight,
+            videoOffsetX,
+            videoOffsetY,
+            scaleX,
+            scaleY,
+            videoAspect: videoAspect.toFixed(2),
+            containerAspect: containerAspect.toFixed(2),
+            videoElementRect: {
+                width: videoRect.width,
+                height: videoRect.height,
+                left: videoRect.left,
+                top: videoRect.top
+            }
+        });
+        
+        // Apply transformation to match the actual video display within the container
         this.ctx.save();
-        this.ctx.translate(offsetX, offsetY); // Translate to account for offset
-        this.ctx.scale(scaleX, scaleY);       // Scale to match video display ratio
+        this.ctx.translate(videoOffsetX, videoOffsetY);
+        this.ctx.scale(scaleX, scaleY);
 
         // Update detection info
         const detectionInfo = document.getElementById('detection-info');
@@ -327,6 +360,13 @@ export class FoodDetectionController {
             const y1 = box.ymin;
             const width = box.xmax - box.xmin;
             const height = box.ymax - box.ymin;
+            
+            // Debug logging for each detection
+            console.log(`Detection "${label}":`, {
+                originalBox: { xmin: box.xmin, ymin: box.ymin, xmax: box.xmax, ymax: box.ymax },
+                calculatedBox: { x1, y1, width, height },
+                score
+            });
             
             // Draw segmentation mask if available and enabled
             if (mask && mask.length > 0 && this.showMasks) {
@@ -398,7 +438,7 @@ export class FoodDetectionController {
             
             // Draw bounding box
             this.ctx.strokeStyle = '#00FF00';
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = 1;
             this.ctx.strokeRect(x1, y1, width, height);
             
             // Draw label background
@@ -408,18 +448,9 @@ export class FoodDetectionController {
             this.ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
             this.ctx.fillRect(x1, y1 - 20, textWidth + 4, 20);
             
-            // Save the current context state
-            this.ctx.save();
-            
-            // Flip the context horizontally for text (accounting for the coordinate system)
-            this.ctx.scale(-1, 1);
-            
-            // Draw label text (flipped position to account for the scale transformation)
+            // Draw label text (normal orientation)
             this.ctx.fillStyle = '#000000';
-            this.ctx.fillText(text, -(x1 + 2), y1 - 5);
-            
-            // Restore the context state
-            this.ctx.restore();
+            this.ctx.fillText(text, x1 + 2, y1 - 5);
         });
         
         // Restore the original context state
