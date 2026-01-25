@@ -540,15 +540,52 @@ def broadcast_to_clients(message_type, content):
         socketio.emit('stream_update', message)
         print(f'[STREAM] Broadcasted {message_type} to {len(connected_clients)} clients')
 
+# Global variables for realistic sensor data simulation
+sensor_state = {
+    'energy': 75,
+    'heartRate': 72,
+    'blood_pressure': 85,
+    'steps': 3450,
+    'calories': 425,
+    'sleep_hours': 7.23
+}
+
 def generate_sensor_data():
-    """Generate fake sensor data like from a sport watch"""
+    """Generate realistic sensor data like from a sport watch with smooth changes"""
+    global sensor_state
+    
+    # Energy level (20-100): 保持不变
+    # energy_change = random.uniform(-2, 2)
+    # sensor_state['energy'] = max(20, min(100, sensor_state['energy'] + energy_change))
+    
+    # Heart rate (60-100): fluctuates around baseline with small changes
+    heart_rate_change = random.uniform(-3, 3)
+    sensor_state['heartRate'] = max(60, min(100, sensor_state['heartRate'] + heart_rate_change))
+    
+    # Blood pressure (70-120): very stable, minimal changes
+    bp_change = random.uniform(-1, 1)
+    sensor_state['blood_pressure'] = max(70, min(120, sensor_state['blood_pressure'] + bp_change))
+    
+    # Steps: 保持不变
+    # steps_increment = random.randint(0, 5)  # 0-5 steps per second when active
+    # sensor_state['steps'] += steps_increment
+    
+    # Calories: gradually increases based on activity
+    calorie_increment = random.randint(0, 2)  # 0-2 calories per second
+    sensor_state['calories'] += calorie_increment
+    
+    # Sleep hours: remains constant during the day
+    # Only change this occasionally to simulate different days
+    if random.random() < 0.001:  # Very small chance to change
+        sensor_state['sleep_hours'] = round(random.uniform(6.5, 8.5), 2)
+    
     return {
-        'energy': random.randint(20, 100),
-        'sleep': f"{random.uniform(6, 9):.2f} Hours",
-        'sport': f"{random.randint(1000, 15000)} Steps",
-        'blood': f"{random.randint(70, 120)}",
-        'heartRate': f"{random.randint(60, 100)}",
-        'calories': f"{random.randint(200, 800)}"
+        'energy': int(sensor_state['energy']),
+        'sleep': f"{sensor_state['sleep_hours']:.2f} Hours",
+        'sport': f"{sensor_state['steps']} Steps",
+        'blood': f"{int(sensor_state['blood_pressure'])}",
+        'heartRate': f"{int(sensor_state['heartRate'])}",
+        'calories': f"{sensor_state['calories']}"
     }
 
 def generate_sensor_html():
@@ -1107,7 +1144,7 @@ async def analyze_audio_with_gemini(audio_path):
         )
         
         analysis_text = response.choices[0].message.content
-        print(f'[GEMINI] Audio analysis completed successfully')
+        print(f'[GEMINI] Audio analysis completed successfully, {analysis_text}')
         
         # Parse detailed analysis and generate HTML
         # Extract key information from the structured response
