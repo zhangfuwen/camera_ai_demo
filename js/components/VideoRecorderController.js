@@ -64,7 +64,7 @@ export class VideoRecorderController {
             
             // Create MediaRecorder instance
             this.mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp8,opus'
+                mimeType: 'video/mp4'
             });
 
             // Set up event handlers
@@ -171,7 +171,7 @@ export class VideoRecorderController {
         
         // Create new MediaRecorder instance using the same stream
         this.mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm;codecs=vp8,opus'
+            mimeType: 'video/mp4'
         });
 
         this.mediaRecorder.ondataavailable = (event) => {
@@ -199,11 +199,11 @@ export class VideoRecorderController {
         }
 
         // Create blob from recorded chunks
-        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+        const blob = new Blob(this.recordedChunks, { type: 'video/mp4' });
         
         // Create timestamp for filename
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `video_${timestamp}.webm`;
+        const filename = `video_${timestamp}.mp4`;
 
         // Add to upload queue
         this.uploadQueue.push({
@@ -425,12 +425,12 @@ export class VideoRecorderController {
         }
 
         try {
-            const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            const blob = new Blob(this.recordedChunks, { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = `recorded_video_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+            a.download = `recorded_video_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

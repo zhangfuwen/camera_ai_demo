@@ -15,6 +15,7 @@ import time
 import random
 import asyncio
 from flask_socketio import SocketIO, emit
+from openai import OpenAI
 
 app = Flask(__name__, static_folder='.', template_folder='.')
 CORS(app)  # Enable CORS for all routes
@@ -29,8 +30,33 @@ stream_data = {
     'overall_status': {}
 }
 
+# Analysis results storage for summary generation
+analysis_results = {
+    'video_analysis': [],  # Store video analysis results
+    'audio_analysis': [],  # Store audio analysis results
+    'emotion_history': [], # Store emotion tracking data
+    'activity_history': [] # Store activity tracking data
+}
+
+# Configuration for storage limits
+MAX_STORED_RESULTS = 50  # Keep last 50 results of each type
+
 # Connected clients
 connected_clients = set()
+
+# Gemini client configuration (using OpenAI library)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'sk-EplRjGkWQ9CwXK5w10936448E56a46BcB487EeE809C6Bd40')
+gemini_client = None
+
+try:
+    gemini_client = OpenAI(
+        api_key=GEMINI_API_KEY,
+        base_url="https://api.apiyi.com/v1"
+    )
+    print('[GEMINI] Client initialized successfully with OpenAI library')
+except Exception as e:
+    print(f'[GEMINI] Failed to initialize client: {e}')
+    gemini_client = None
 
 # Load the trained food detection model
 # First try to load the trained model from the training directory
@@ -316,8 +342,8 @@ def upload_video():
         
         # Secure the filename and ensure it has the correct extension
         filename = werkzeug.utils.secure_filename(video_file.filename)
-        if not filename.lower().endswith('.webm'):
-            filename += '.webm'
+        # if not filename.lower().endswith('.webm'):
+        #     filename += '.webm'
         
         # Add timestamp prefix to ensure unique ordering
         timestamp_prefix = timestamp.replace(':', '-').replace('.', '-')
@@ -522,76 +548,85 @@ def generate_sensor_data():
     }
 
 def generate_sensor_html():
-    """Generate HTML for sensor values"""
+    """Generate plain text for sensor values"""
     data = generate_sensor_data()
-    return f"""
-    <div class="text-green-500">
-        <div>Energy: {data['energy']}</div>
-        <div>Sleep: {data['sleep']}</div>
-        <div>Sport: {data['sport']}</div>
-        <div>Blood Pressure: {data['blood']}</div>
-        <div>HeartRate: {data['heartRate']}</div>
-        <div>Calories: {data['calories']}</div>
-    </div>
-    """
+    return f"""能量值: {data['energy']}
+睡眠时长: {data['sleep']} 小时
+运动步数: {data['sport']} 步
+血压: {data['blood']}
+心率: {data['heartRate']} 次/分
+卡路里: {data['calories']} 卡"""
 
 def generate_emotion_html():
-    """Generate HTML for user emotions"""
-    emotions = ['Happy', 'Focused', 'Neutral', 'Relaxed', 'Concentrated', 'Thoughtful']
-    emotion = random.choice(emotions)
-    confidence = random.uniform(0.7, 0.95)
-    return f"""
-    <div class="text-green-500">
-        <div>Emotion: {emotion}</div>
-        <div>Confidence: {confidence:.2f}</div>
-        <div>Detected: {datetime.now().strftime('%H:%M:%S')}</div>
-    </div>
-    """
+    """Generate plain text for user emotions from stored analysis results"""
+    if analysis_results['emotion_history']:
+        # Get the most recent emotion analysis
+        latest_emotion = analysis_results['emotion_history'][-1]
+        return f"""情绪状态: {latest_emotion['emotion']}
+强度: {latest_emotion['intensity']}
+检测时间: {datetime.fromisoformat(latest_emotion['timestamp']).strftime('%H:%M:%S')}"""
+    else:
+        print("[EMOTION] No emotion analysis results available", analysis_results['emotion_history'])
+        # Fallback if no analysis results available
+        return "情绪状态: 等待分析数据..."
 
 def generate_audio_detection_html():
-    """Generate HTML for audio detection results"""
-    activities = ['Speaking', 'Silent', 'Background noise', 'Conversation', 'Typing']
-    activity = random.choice(activities)
-    volume = random.randint(20, 80)
-    return f"""
-    <div class="text-green-500">
-        <div>Activity: {activity}</div>
-        <div>Volume: {volume} dB</div>
-        <div>Duration: {random.randint(1, 10)}s</div>
-    </div>
-    """
+    """Generate plain text for audio detection results from stored analysis results"""
+    if analysis_results['audio_analysis']:
+        # Get the most recent audio analysis
+        latest_audio = analysis_results['audio_analysis'][-1]
+        return f"""语音内容: {latest_audio['speech_content']}
+情绪状态: {latest_audio['emotion_state']}
+音量: {latest_audio['volume_level']}
+音质: {latest_audio['voice_quality']}
+分析时间: {datetime.fromisoformat(latest_audio['timestamp']).strftime('%H:%M:%S')}"""
+    else:
+        print("[AUDIO] No audio analysis results available", analysis_results['audio_analysis'])
+        # Fallback if no analysis results available
+        return "音频分析: 等待分析数据..."
 
 def generate_video_detection_html():
-    """Generate HTML for video detection results"""
-    activities = ['Working at computer', 'Looking at screen', 'Typing', 'Reading', 'Writing notes']
-    activity = random.choice(activities)
-    objects = ['person', 'computer', 'keyboard', 'mouse', 'cup']
-    detected_objects = random.sample(objects, random.randint(1, 3))
-    return f"""
-    <div class="text-green-500">
-        <div>Activity: {activity}</div>
-        <div>Objects: {', '.join(detected_objects)}</div>
-        <div>Movement: {random.choice(['Low', 'Medium', 'High'])}</div>
-    </div>
-    """
+    """Generate plain text for video detection results from stored analysis results"""
+    if analysis_results['video_analysis']:
+        # Get the most recent video analysis
+        latest_video = analysis_results['video_analysis'][-1]
+        return f"""活动强度: {latest_video['activity_level']}
+心理状态: {latest_video['overall_state']}
+情绪强度: {latest_video['emotion_intensity']}
+主要情绪: {latest_video['emotion_state']}
+分析时间: {datetime.fromisoformat(latest_video['timestamp']).strftime('%H:%M:%S')}"""
+    else:
+        # Fallback if no analysis results available
+        return "视频分析: 等待分析数据..."
 
 def generate_overall_status_html():
-    """Generate HTML for overall user status"""
-    statuses = [
-        'User is actively working and focused',
-        'User appears to be in a productive state',
-        'User is engaged in computer-based activities',
-        'User shows normal work patterns',
-        'User is maintaining consistent activity levels'
-    ]
-    status = random.choice(statuses)
-    return f"""
-    <div class="text-green-500">
-        <div><strong>Overall Status:</strong></div>
-        <div>{status}</div>
-        <div class="text-xs mt-1">Updated: {datetime.now().strftime('%H:%M:%S')}</div>
-    </div>
-    """
+    """Generate plain text for overall user status from stored analysis results"""
+    total_analyses = len(analysis_results['video_analysis']) + len(analysis_results['audio_analysis'])
+    
+    if total_analyses > 0:
+        # Get recent analyses for summary
+        recent_emotions = [e['emotion'] for e in analysis_results['emotion_history'][-5:]]
+        recent_activities = [a['activity'] for a in analysis_results['activity_history'][-5:]]
+        
+        # Determine most common emotion and activity
+        if recent_emotions:
+            most_common_emotion = max(set(recent_emotions), key=recent_emotions.count)
+        else:
+            most_common_emotion = "未知"
+            
+        if recent_activities:
+            most_common_activity = max(set(recent_activities), key=recent_activities.count)
+        else:
+            most_common_activity = "未知"
+        
+        return f"""整体状态: 基于最近{total_analyses}次分析
+主要情绪: {most_common_emotion}
+主要活动: {most_common_activity}
+数据更新: {datetime.now().strftime('%H:%M:%S')}
+分析次数: 视频{len(analysis_results['video_analysis'])}次, 音频{len(analysis_results['audio_analysis'])}次"""
+    else:
+        # Fallback if no analysis results available
+        return "整体状态: 等待分析数据..."
 
 def sensor_update_timer():
     """Timer for updating sensor values every 1 second"""
@@ -619,54 +654,543 @@ def overall_status_timer():
     """Timer for updating overall status every 20 seconds"""
     while True:
         try:
-            html_content = generate_overall_status_html()
-            broadcast_to_clients('overall_status', html_content)
+            # Generate comprehensive summary using stored analysis results
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                summary_text = loop.run_until_complete(generate_comprehensive_summary())
+                summary_html = generate_summary_html(summary_text)
+                broadcast_to_clients('overall_status', summary_html)
+            finally:
+                loop.close()
             time.sleep(20)
         except Exception as e:
             print(f'[STREAM] Error in overall status timer: {e}')
             time.sleep(20)
 
+def comprehensive_summary_timer():
+    """Timer for generating comprehensive summaries every 5 minutes"""
+    while True:
+        try:
+            print('[SUMMARY] Starting comprehensive summary generation...')
+            # Generate comprehensive summary using stored analysis results
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                summary_text = loop.run_until_complete(generate_comprehensive_summary())
+                summary_html = generate_summary_html(summary_text)
+                broadcast_to_clients('overall_status', summary_html)
+                print('[SUMMARY] Comprehensive summary generated and broadcasted')
+            finally:
+                loop.close()
+            time.sleep(300)  # 5 minutes
+        except Exception as e:
+            print(f'[SUMMARY] Error in comprehensive summary timer: {e}')
+            time.sleep(300)
+
 async def analyze_video_with_gemini(video_path):
     """Analyze video using Gemini model"""
     try:
-        # This is a placeholder for Gemini integration
-        # In real implementation, you would use Google's Gemini API
+        if not gemini_client:
+            print('[GEMINI] Client not available, using fallback')
+            # Fallback to mock data
+            html_content = generate_video_detection_html()
+            broadcast_to_clients('video_detect', html_content)
+            emotion_html = generate_emotion_html()
+            broadcast_to_clients('emotion_update', emotion_html)
+            return
+        
         print(f'[GEMINI] Analyzing video: {video_path}')
         
-        # Simulate API call delay
-        await asyncio.sleep(2)
+        # Check if file exists and get file info
+        import os
+        if not os.path.exists(video_path):
+            print(f'[GEMINI] Error: Video file does not exist: {video_path}')
+            return
         
-        # Generate mock analysis results
-        html_content = generate_video_detection_html()
-        broadcast_to_clients('video_detect', html_content)
+        file_size = os.path.getsize(video_path)
+        print(f'[GEMINI] Video file info - Path: {video_path}, Size: {file_size} bytes')
         
-        # Generate emotion analysis
-        emotion_html = generate_emotion_html()
-        broadcast_to_clients('emotion_update', emotion_html)
+        # Test Gemini client connectivity
+        try:
+            print(f'[GEMINI] Testing client connectivity...')
+            test_response = gemini_client.chat.completions.create(
+                model='gemini-3-pro-preview',
+                messages=[{"role": "user", "content": "Hello, this is a test."}],
+                max_tokens=50
+            )
+            print(f'[GEMINI] Client connectivity test passed')
+        except Exception as e:
+            print(f'[GEMINI] Client connectivity test failed: {e}')
+            return
+        
+        # Read and encode video file
+        try:
+            with open(video_path, "rb") as f:
+                video_b64 = base64.b64encode(f.read()).decode()
+                video_url = f"data:video/mp4;base64,{video_b64}"
+            print(f'[GEMINI] Video encoded successfully')
+        except Exception as e:
+            print(f'[GEMINI] Error encoding video: {e}')
+            return
+        
+        # Analyze video content
+        analysis_prompt = """请详细分析这个视频中的人物，提供以下信息：
+
+1. **面部表情分析**：
+   - 主要情绪状态（快乐、悲伤、愤怒、惊讶、恐惧、厌恶、中性等）
+   - 情绪强度（1-10分）
+   - 表情变化描述
+
+2. **肢体语言分析**：
+   - 姿态和动作描述
+   - 身体语言传达的情绪
+   - 活动强度（低/中/高）
+
+3. **环境与活动**：
+   - 当前主要活动
+   - 环境描述
+   - 检测到的关键对象
+
+4. **综合情绪评估**：
+   - 整体心理状态
+   - 注意力集中程度
+   - 可能的情绪原因
+
+请用结构化的中文回答，每个部分详细描述。"""
+        
+        response = gemini_client.chat.completions.create(
+            model="gemini-3-pro-preview",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant specialized in video analysis."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": analysis_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": video_url
+                            },
+                            "mime_type": "video/mp4",
+                        }
+                    ]
+                }
+            ],
+            temperature=0.2,
+            max_tokens=4096
+        )
+        
+        analysis_text = response.choices[0].message.content
+        print(f'[GEMINI] Video analysis completed successfully')
+        
+        # Parse detailed analysis and generate HTML
+        # Extract key information from the structured response
+        emotion_state = "未检测到"
+        emotion_intensity = "未知"
+        activity_level = "未知"
+        overall_state = "正常"
+        
+        # Parse the analysis text for key information
+        if "面部表情分析" in analysis_text:
+            lines = analysis_text.split('\n')
+            for i, line in enumerate(lines):
+                if "主要情绪状态" in line:
+                    emotion_state = line.split('：')[-1].strip() if '：' in line else emotion_state
+                elif "情绪强度" in line:
+                    emotion_intensity = line.split('：')[-1].strip() if '：' in line else emotion_intensity
+                elif "活动强度" in line:
+                    activity_level = line.split('：')[-1].strip() if '：' in line else activity_level
+                elif "整体心理状态" in line:
+                    overall_state = line.split('：')[-1].strip() if '：' in line else overall_state
+        
+        # Generate comprehensive video detection text
+        video_text = f"活动强度: {activity_level}\n心理状态: {overall_state}\n情绪强度: {emotion_intensity}\n分析时间: {datetime.now().strftime('%H:%M:%S')}"
+        broadcast_to_clients('video_detect', video_text)
+        
+        # Generate detailed emotion text
+        emotion_text = f"主要情绪: {emotion_state}\n检测时间: {datetime.now().strftime('%H:%M:%S')}\n分析模型: Gemini-3-Pro"
+        broadcast_to_clients('emotion_update', emotion_text)
+        
+        # Store analysis results for summary generation
+        video_result = {
+            'timestamp': datetime.now().isoformat(),
+            'emotion_state': emotion_state,
+            'emotion_intensity': emotion_intensity,
+            'activity_level': activity_level,
+            'overall_state': overall_state,
+            'full_analysis': analysis_text,
+            'file_path': video_path
+        }
+        
+        # Add to storage with size limit
+        analysis_results['video_analysis'].append(video_result)
+        print(f'[STORAGE] Stored video analysis result: {analysis_results["video_analysis"][-1]}')
+        if len(analysis_results['video_analysis']) > MAX_STORED_RESULTS:
+            analysis_results['video_analysis'].pop(0)
+        
+        # Store emotion history
+        emotion_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'source': 'video',
+            'emotion': emotion_state,
+            'intensity': emotion_intensity,
+            'confidence': 'high'
+        }
+        analysis_results['emotion_history'].append(emotion_entry)
+        if len(analysis_results['emotion_history']) > MAX_STORED_RESULTS:
+            analysis_results['emotion_history'].pop(0)
+        
+        # Store activity history
+        activity_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'source': 'video',
+            'activity': overall_state,
+            'intensity': activity_level
+        }
+        analysis_results['activity_history'].append(activity_entry)
+        if len(analysis_results['activity_history']) > MAX_STORED_RESULTS:
+            analysis_results['activity_history'].pop(0)
+        
+        print(f'[STORAGE] Stored video analysis results. Total stored: {len(analysis_results["video_analysis"])}')
+        
+        # Clean up uploaded file
+        try:
+            gemini_client.files.delete(uploaded_file.name)
+            print(f'[GEMINI] Cleaned up video file: {uploaded_file.name}')
+        except:
+            pass
         
         print(f'[GEMINI] Video analysis completed for: {video_path}')
         
     except Exception as e:
         print(f'[GEMINI] Error analyzing video: {e}')
+        # Fallback to mock data
+        html_content = generate_video_detection_html()
+        broadcast_to_clients('video_detect', html_content)
+        emotion_html = generate_emotion_html()
+        broadcast_to_clients('emotion_update', emotion_html)
+
+async def generate_comprehensive_summary():
+    """Generate comprehensive summary using stored analysis results"""
+    try:
+        if not gemini_client:
+            print('[SUMMARY] Gemini client not available, using fallback')
+            return generate_mock_summary()
+        
+        # Check if we have enough data for meaningful summary
+        total_analyses = len(analysis_results['video_analysis']) + len(analysis_results['audio_analysis'])
+        if total_analyses < 2:
+            print('[SUMMARY] Insufficient data for comprehensive summary')
+            return generate_mock_summary()
+        
+        print(f'[SUMMARY] Generating comprehensive summary from {total_analyses} analyses')
+        
+        # Prepare data for summary
+        recent_video = analysis_results['video_analysis'][-5:]  # Last 5 video analyses
+        recent_audio = analysis_results['audio_analysis'][-5:]  # Last 5 audio analyses
+        emotion_history = analysis_results['emotion_history'][-10:]  # Last 10 emotion entries
+        activity_history = analysis_results['activity_history'][-10:]  # Last 10 activity entries
+        
+        # Build summary prompt
+        summary_prompt = f"""基于以下分析结果，请生成一个综合性的用户状态总结：
+
+## 视频分析结果（最近{len(recent_video)}次）：
+{chr(10).join([f"- {v['timestamp']}: 情绪={v['emotion_state']}, 强度={v['emotion_intensity']}, 状态={v['overall_state']}" for v in recent_video])}
+
+## 音频分析结果（最近{len(recent_audio)}次）：
+{chr(10).join([f"- {a['timestamp']}: 情绪={a['emotion_state']}, 音量={a['volume_level']}, 内容={a['speech_content']}" for a in recent_audio])}
+
+## 情绪历史（最近{len(emotion_history)}次）：
+{chr(10).join([f"- {e['timestamp']}: {e['source']} - {e['emotion']} (强度: {e['intensity']})" for e in emotion_history])}
+
+## 活动历史（最近{len(activity_history)}次）：
+{chr(10).join([f"- {a['timestamp']}: {a['source']} - {a['activity']}" for a in activity_history])}
+
+请基于以上数据，提供以下总结：
+
+1. **整体情绪趋势分析**：
+   - 主要情绪模式
+   - 情绪变化趋势
+   - 情绪稳定性评估
+
+2. **活动模式分析**：
+   - 主要活动类型
+   - 活动强度变化
+   - 工作/休息平衡
+
+3. **沟通模式分析**：
+   - 语音活动频率
+   - 沟通情绪特征
+   - 表达方式特点
+
+4. **综合状态评估**：
+   - 当前整体状态
+   - 压力水平评估
+   - 效率状态评估
+
+5. **建议和提醒**：
+   - 健康建议
+   - 工作效率建议
+   - 情绪管理建议
+
+请用结构化的中文回答，每个部分详细分析并提供具体建议。"""
+
+        # Generate summary using Gemini
+        response = gemini_client.chat.completions.create(
+            model="gemini-3-pro-preview",
+            messages=[{"role": "user", "content": summary_prompt}],
+            temperature=0.3,
+            max_tokens=4096
+        )
+        
+        summary_text = response.choices[0].message.content
+        print(f'[SUMMARY] Comprehensive summary generated successfully')
+        
+        return summary_text
+        
+    except Exception as e:
+        print(f'[SUMMARY] Error generating comprehensive summary: {e}')
+        return generate_mock_summary()
+
+def generate_mock_summary():
+    """Generate mock summary when Gemini is unavailable"""
+    import random
+    
+    emotion_states = ['专注', '平静', '积极', '放松', '投入']
+    activity_levels = ['中等', '较高', '适中', '稳定']
+    
+    mock_summary = f"""
+## 综合状态总结
+
+### 1. 整体情绪趋势分析
+- **主要情绪模式**: {random.choice(emotion_states)}
+- **情绪变化趋势**: 情绪状态相对稳定
+- **情绪稳定性评估**: 良好
+
+### 2. 活动模式分析
+- **主要活动类型**: 电脑工作
+- **活动强度变化**: {random.choice(activity_levels)}
+- **工作/休息平衡**: 需要注意适当休息
+
+### 3. 沟通模式分析
+- **语音活动频率**: 适中
+- **沟通情绪特征**: 积极正面
+- **表达方式特点**: 清晰流畅
+
+### 4. 综合状态评估
+- **当前整体状态**: 良好
+- **压力水平评估**: 中等
+- **效率状态评估**: 高效
+
+### 5. 建议和提醒
+- **健康建议**: 定时休息，保护视力
+- **工作效率建议**: 保持专注，适当调整
+- **情绪管理建议**: 保持积极心态
+
+*注：此为模拟总结，实际分析需要更多数据*
+"""
+    
+    return mock_summary
+
+def generate_summary_html(summary_text):
+    """Generate plain text for summary display"""
+    # Convert markdown-style headers to plain text
+    import re
+    
+    # Convert headers to plain text with separators
+    summary_text = re.sub(r'^### (.*?)$', r'---\n\1\n---', summary_text, flags=re.MULTILINE)
+    summary_text = re.sub(r'^## (.*?)$', r'===\n\1\n===', summary_text, flags=re.MULTILINE)
+    summary_text = re.sub(r'^# (.*?)$', r'***\n\1\n***', summary_text, flags=re.MULTILINE)
+    
+    # Convert bold text to plain text
+    summary_text = re.sub(r'\*\*(.*?)\*\*', r'\1', summary_text)
+    
+    # Convert list items to plain text with bullets
+    summary_text = re.sub(r'^- (.*?)$', r'• \1', summary_text, flags=re.MULTILINE)
+    
+    # Clean up extra line breaks
+    summary_text = re.sub(r'\n{3,}', '\n\n', summary_text)
+    
+    # Wrap in container with simple format
+    text_content = f"""📊 综合状态总结
+生成时间: {datetime.now().strftime('%H:%M:%S')}
+{summary_text}"""
+    
+    return text_content
 
 async def analyze_audio_with_gemini(audio_path):
     """Analyze audio using Gemini model"""
     try:
-        # This is a placeholder for Gemini integration
-        # In real implementation, you would use Google's Gemini API
+        if not gemini_client:
+            print('[GEMINI] Client not available, using fallback')
+            # Fallback to mock data
+            html_content = generate_audio_detection_html()
+            broadcast_to_clients('audio_detect', html_content)
+            return
+        
         print(f'[GEMINI] Analyzing audio: {audio_path}')
         
-        # Simulate API call delay
-        await asyncio.sleep(1.5)
+        # Check if file exists and get file info
+        import os
+        if not os.path.exists(audio_path):
+            print(f'[GEMINI] Error: Audio file does not exist: {audio_path}')
+            return
         
-        # Generate mock analysis results
-        html_content = generate_audio_detection_html()
-        broadcast_to_clients('audio_detect', html_content)
+        file_size = os.path.getsize(audio_path)
+        print(f'[GEMINI] Audio file info - Path: {audio_path}, Size: {file_size} bytes')
+        
+        # Read and encode audio file
+        try:
+            with open(audio_path, "rb") as f:
+                audio_b64 = base64.b64encode(f.read()).decode()
+                audio_url = f"data:audio/webm;base64,{audio_b64}"
+            print(f'[GEMINI] Audio encoded successfully')
+        except Exception as e:
+            print(f'[GEMINI] Error encoding audio: {e}')
+            return
+        
+        # Transcribe and analyze audio content
+        analysis_prompt = """请详细分析这段音频中的语音和声音，提供以下信息：
+
+1. **语音内容分析**：
+   - 完整转录文本
+   - 语言和口音特征
+   - 语速和流畅度
+
+2. **声音情绪分析**：
+   - 主要情绪状态（快乐、悲伤、愤怒、焦虑、兴奋、平静等）
+   - 情绪强度（1-10分）
+   - 语调变化和情感色彩
+
+3. **声音特征**：
+   - 音量水平（低/中/高）
+   - 音调高低
+   - 声音清晰度
+
+4. **环境声音**：
+   - 背景噪音描述
+   - 环境音效
+   - 音频质量评估
+
+5. **综合心理状态**：
+   - 说话者心理状态推断
+   - 情绪稳定性
+   - 可能的情绪触发因素
+
+请用结构化的中文回答，每个部分详细分析。"""
+        
+        response = gemini_client.chat.completions.create(
+            model="gemini-3-pro-preview",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant specialized in audio analysis."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": analysis_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": audio_url
+                            },
+                            "mime_type": "audio/webm",
+                        }
+                    ]
+                }
+            ],
+            temperature=0.2,
+            max_tokens=4096
+        )
+        
+        analysis_text = response.choices[0].message.content
+        print(f'[GEMINI] Audio analysis completed successfully')
+        
+        # Parse detailed analysis and generate HTML
+        # Extract key information from the structured response
+        speech_content = "无语音"
+        emotion_state = "未检测到"
+        emotion_intensity = "未知"
+        volume_level = "未知"
+        voice_quality = "正常"
+        
+        # Parse the analysis text for key information
+        if "语音内容分析" in analysis_text or "声音情绪分析" in analysis_text:
+            lines = analysis_text.split('\n')
+            for i, line in enumerate(lines):
+                if "转录文本" in line or "完整转录文本" in line:
+                    speech_content = line.split('：')[-1].strip() if '：' in line else speech_content
+                    # Limit transcript length for display
+                    if len(speech_content) > 50:
+                        speech_content = speech_content[:50] + "..."
+                elif "主要情绪状态" in line:
+                    emotion_state = line.split('：')[-1].strip() if '：' in line else emotion_state
+                elif "情绪强度" in line:
+                    emotion_intensity = line.split('：')[-1].strip() if '：' in line else emotion_intensity
+                elif "音量水平" in line:
+                    volume_level = line.split('：')[-1].strip() if '：' in line else volume_level
+                elif "声音清晰度" in line:
+                    voice_quality = line.split('：')[-1].strip() if '：' in line else voice_quality
+        
+        # Generate comprehensive audio detection text
+        audio_text = f"语音内容: {speech_content}\n情绪状态: {emotion_state}\n音量: {volume_level}\n音质: {voice_quality}\n分析时间: {datetime.now().strftime('%H:%M:%S')}"
+        broadcast_to_clients('audio_detect', audio_text)
+        
+        # Store analysis results for summary generation
+        audio_result = {
+            'timestamp': datetime.now().isoformat(),
+            'speech_content': speech_content,
+            'emotion_state': emotion_state,
+            'emotion_intensity': emotion_intensity,
+            'volume_level': volume_level,
+            'voice_quality': voice_quality,
+            'full_analysis': analysis_text,
+            'file_path': audio_path
+        }
+        
+        # Add to storage with size limit
+        analysis_results['audio_analysis'].append(audio_result)
+        if len(analysis_results['audio_analysis']) > MAX_STORED_RESULTS:
+            analysis_results['audio_analysis'].pop(0)
+        
+        # Store emotion history from audio
+        emotion_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'source': 'audio',
+            'emotion': emotion_state,
+            'intensity': emotion_intensity,
+            'confidence': 'high'
+        }
+        analysis_results['emotion_history'].append(emotion_entry)
+        if len(analysis_results['emotion_history']) > MAX_STORED_RESULTS:
+            analysis_results['emotion_history'].pop(0)
+        
+        # Store activity history from audio
+        activity_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'source': 'audio',
+            'activity': f"语音活动: {speech_content[:20]}..." if len(speech_content) > 20 else f"语音活动: {speech_content}",
+            'intensity': volume_level
+        }
+        analysis_results['activity_history'].append(activity_entry)
+        if len(analysis_results['activity_history']) > MAX_STORED_RESULTS:
+            analysis_results['activity_history'].pop(0)
+        
+        print(f'[STORAGE] Stored audio analysis results. Total stored: {len(analysis_results["audio_analysis"])}')
+        
+        # Clean up uploaded file
+        try:
+            gemini_client.files.delete(uploaded_file.name)
+            print(f'[GEMINI] Cleaned up audio file: {uploaded_file.name}')
+        except:
+            pass
         
         print(f'[GEMINI] Audio analysis completed for: {audio_path}')
         
     except Exception as e:
         print(f'[GEMINI] Error analyzing audio: {e}')
+        # Fallback to mock data
+        html_content = generate_audio_detection_html()
+        broadcast_to_clients('audio_detect', html_content)
 
 def run_gemini_video_analysis(video_path):
     """Run video analysis in async context"""
@@ -704,6 +1228,11 @@ def start_background_timers():
     status_thread = threading.Thread(target=overall_status_timer, daemon=True)
     status_thread.start()
     print('[STREAM] Started overall status timer (20s)')
+
+    # Comprehensive summary timer (5 minutes)
+    summary_thread = threading.Thread(target=comprehensive_summary_timer, daemon=True)
+    summary_thread.start()
+    print('[SUMMARY] Started comprehensive summary timer (5m)')
 
 
 if __name__ == '__main__':

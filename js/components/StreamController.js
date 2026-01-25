@@ -109,8 +109,14 @@ export class StreamController {
     updateStatusOverlay(selector, content) {
         const element = document.querySelector(selector);
         if (element) {
-            element.innerHTML = content;
-            console.log(`Updated ${selector} with new content`);
+            // Use textContent for plain text and style for better formatting
+            element.textContent = content;
+            element.style.whiteSpace = 'pre-line';
+            element.style.fontFamily = 'monospace';
+            element.style.fontSize = '11px';
+            element.style.lineHeight = '1.3';
+            element.style.color = '#22c55e';
+            console.log(`Updated ${selector} with plain text content`);
         } else {
             console.warn(`Element not found: ${selector}`);
         }

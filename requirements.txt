@@ -12,3 +12,5 @@ timm>=1.0.24
 ultralytics>=8.0.0
 flask-cors
 flask-socketio
+google-genai
+openai
