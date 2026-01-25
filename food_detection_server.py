@@ -61,7 +61,11 @@ except Exception as e:
 # Load the trained food detection model
 # First try to load the trained model from the training directory
 #model_path = "food_detection_training/runs/detect/food_det_model/weights/best.pt"
-model_path = "yolov8n-seg.pt"
+# model_path = "yolov8n-seg.pt"
+model_path = "best.pt"
+model_path = "./food_detection_training/runs/detect/food_det_model/weights/best.pt"
+model_path = "./food_detection_training/yolov8n-seg.pt"
+model_path = "yolo26x.pt"
 fallback_model_path = "yolov8n.pt"
 
 print("Loading food detection model...")

@@ -132,13 +132,19 @@ export class CameraController {
                 console.log(`Resolution step: ${capabilities.width.step}x${capabilities.height.step}`);
                 
                 // Generate common resolutions within the supported range
+                // const commonResolutions = [
+                //     { width: 640, height: 480 },   // VGA
+                //     { width: 1280, height: 720 },  // 720p HD
+                //     { width: 1920, height: 1080 }, // 1080p Full HD
+                //     { width: 3840, height: 2160 }  // 4K UHD
+                // ];
                 const commonResolutions = [
                     { width: 640, height: 480 },   // VGA
                     { width: 1280, height: 720 },  // 720p HD
                     { width: 1920, height: 1080 }, // 1080p Full HD
                     { width: 3840, height: 2160 }  // 4K UHD
                 ];
-                
+
                 const supportedResolutions = commonResolutions.filter(res => 
                     res.width >= capabilities.width.min && 
                     res.width <= capabilities.width.max &&

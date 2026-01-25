@@ -185,8 +185,41 @@ export class FoodDetectionController {
             tempCanvas.height = sourceHeight;
             const tempCtx = tempCanvas.getContext('2d');
 
-            // Draw the current frame to the temporary canvas
+            // Apply the same transforms that are applied to the video element
+            // Get the camera controller to access transform settings
+            const cameraController = window.cameraController;
+            if (cameraController && cameraController.videoElement === sourceElement) {
+                // Save the current context state
+                tempCtx.save();
+                
+                // Apply mirror effect if enabled
+                if (cameraController.isMirrored) {
+                    tempCtx.scale(-1, 1);
+                    tempCtx.translate(-tempCanvas.width, 0);
+                }
+                
+                // Apply rotation if set
+                if (cameraController.rotationAngle !== 0) {
+                    const centerX = tempCanvas.width / 2;
+                    const centerY = tempCanvas.height / 2;
+                    tempCtx.translate(centerX, centerY);
+                    tempCtx.rotate((cameraController.rotationAngle * Math.PI) / 180);
+                    tempCtx.translate(-centerX, -centerY);
+                }
+                
+                console.log('Applied video transforms to capture:', {
+                    isMirrored: cameraController.isMirrored,
+                    rotationAngle: cameraController.rotationAngle
+                });
+            }
+
+            // Draw the current frame to the temporary canvas with transforms applied
             tempCtx.drawImage(sourceElement, 0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Restore context state if transforms were applied
+            if (cameraController && cameraController.videoElement === sourceElement) {
+                tempCtx.restore();
+            }
 
             console.log("Source resolution:", sourceWidth, "x", sourceHeight);
             console.log("Canvas resolution:", tempCanvas.width, "x", tempCanvas.height);
@@ -262,9 +295,26 @@ export class FoodDetectionController {
         const containerRect = videoContainer.getBoundingClientRect();
         const videoRect = sourceElement.getBoundingClientRect();
         
+        // Get camera controller to check for rotation
+        const cameraController = window.cameraController;
+        let effectiveSourceWidth = sourceWidth;
+        let effectiveSourceHeight = sourceHeight;
+        
+        // If video is rotated by 90 or 270 degrees, swap dimensions
+        if (cameraController && cameraController.videoElement === sourceElement) {
+            if (cameraController.rotationAngle === 90 || cameraController.rotationAngle === 270) {
+                effectiveSourceWidth = sourceHeight;
+                effectiveSourceHeight = sourceWidth;
+                console.log('Video rotated 90/270°, swapped dimensions:', {
+                    original: `${sourceWidth}x${sourceHeight}`,
+                    effective: `${effectiveSourceWidth}x${effectiveSourceHeight}`
+                });
+            }
+        }
+        
         // Calculate the actual video content area within the main-video element
         // The video element has object-contain, so the actual video content might be smaller than the element
-        const videoAspect = sourceWidth / sourceHeight;
+        const videoAspect = effectiveSourceWidth / effectiveSourceHeight;
         const videoElementAspect = videoRect.width / videoRect.height;
         
         let actualVideoWidth, actualVideoHeight, videoOffsetInElementX, videoOffsetInElementY;
@@ -304,14 +354,17 @@ export class FoodDetectionController {
         // Clear previous drawings
         this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
 
-        // Calculate scaling factors from source resolution to actual video content area
-        const scaleX = actualVideoWidth / sourceWidth;
-        const scaleY = actualVideoHeight / sourceHeight;
+        // Calculate scaling factors from effective source resolution to actual video content area
+        const scaleX = actualVideoWidth / effectiveSourceWidth;
+        const scaleY = actualVideoHeight / effectiveSourceHeight;
         
         // Debug logging
-        console.log('Detection overlay alignment (actual video content):', {
+        console.log('Detection overlay alignment (with rotation):', {
             sourceWidth,
             sourceHeight,
+            effectiveSourceWidth,
+            effectiveSourceHeight,
+            rotationAngle: cameraController?.rotationAngle || 0,
             containerWidth: containerRect.width,
             containerHeight: containerRect.height,
             videoElementWidth: videoRect.width,
