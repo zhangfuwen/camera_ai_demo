@@ -104,19 +104,92 @@ export class StreamController {
     }
 
     /**
-     * Update status overlay with new content
+     * Update status overlay with new content and flip animation
      */
     updateStatusOverlay(selector, content) {
         const element = document.querySelector(selector);
         if (element) {
-            // Use textContent for plain text and style for better formatting
+            // Add flip animation class
+            element.classList.add('card-flip');
+            
+            // Update content after a short delay to sync with animation
+            setTimeout(() => {
+                // Use textContent for plain text and style for better formatting
+                element.textContent = content;
+                element.style.whiteSpace = 'pre-line';
+                element.style.fontFamily = 'monospace';
+                element.style.fontSize = '11px';
+                element.style.lineHeight = '1.3';
+                element.style.color = '#22c55e';
+                
+                console.log(`Updated ${selector} with plain text content`);
+            }, 300); // Halfway through the animation
+            
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                element.classList.remove('card-flip');
+            }, 600);
+            
+        } else {
+            console.warn(`Element not found: ${selector}`);
+        }
+    }
+    
+    /**
+     * Update status overlay with pulse animation (alternative effect)
+     */
+    updateStatusOverlayPulse(selector, content) {
+        const element = document.querySelector(selector);
+        if (element) {
+            // Add pulse animation class
+            element.classList.add('status-pulse');
+            
+            // Update content immediately
             element.textContent = content;
             element.style.whiteSpace = 'pre-line';
             element.style.fontFamily = 'monospace';
             element.style.fontSize = '11px';
             element.style.lineHeight = '1.3';
             element.style.color = '#22c55e';
-            console.log(`Updated ${selector} with plain text content`);
+            
+            console.log(`Updated ${selector} with plain text content (pulse effect)`);
+            
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                element.classList.remove('status-pulse');
+            }, 400);
+            
+        } else {
+            console.warn(`Element not found: ${selector}`);
+        }
+    }
+    
+    /**
+     * Update status overlay with flip animation (Y-axis rotation)
+     */
+    updateStatusOverlayFlip(selector, content) {
+        const element = document.querySelector(selector);
+        if (element) {
+            // Add flip animation class
+            element.classList.add('flipping');
+            
+            // Update content after a short delay to sync with animation
+            setTimeout(() => {
+                element.textContent = content;
+                element.style.whiteSpace = 'pre-line';
+                element.style.fontFamily = 'monospace';
+                element.style.fontSize = '11px';
+                element.style.lineHeight = '1.3';
+                element.style.color = '#22c55e';
+                
+                console.log(`Updated ${selector} with plain text content (flip effect)`);
+            }, 300); // Halfway through the animation
+            
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                element.classList.remove('flipping');
+            }, 600);
+            
         } else {
             console.warn(`Element not found: ${selector}`);
         }
