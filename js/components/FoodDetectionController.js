@@ -262,6 +262,31 @@ export class FoodDetectionController {
         const containerRect = videoContainer.getBoundingClientRect();
         const videoRect = sourceElement.getBoundingClientRect();
         
+        // Calculate the actual video content area within the main-video element
+        // The video element has object-contain, so the actual video content might be smaller than the element
+        const videoAspect = sourceWidth / sourceHeight;
+        const videoElementAspect = videoRect.width / videoRect.height;
+        
+        let actualVideoWidth, actualVideoHeight, videoOffsetInElementX, videoOffsetInElementY;
+        
+        if (videoAspect > videoElementAspect) {
+            // Video is wider than the video element aspect ratio - fits to width
+            actualVideoWidth = videoRect.width;
+            actualVideoHeight = videoRect.width / videoAspect;
+            videoOffsetInElementX = 0;
+            videoOffsetInElementY = (videoRect.height - actualVideoHeight) / 2;
+        } else {
+            // Video is taller than the video element aspect ratio - fits to height
+            actualVideoWidth = videoRect.height * videoAspect;
+            actualVideoHeight = videoRect.height;
+            videoOffsetInElementX = (videoRect.width - actualVideoWidth) / 2;
+            videoOffsetInElementY = 0;
+        }
+        
+        // Calculate the position of the video content relative to the container
+        const videoOffsetInContainerX = videoRect.left - containerRect.left + videoOffsetInElementX;
+        const videoOffsetInContainerY = videoRect.top - containerRect.top + videoOffsetInElementY;
+        
         // Set canvas size to match the container (same as video w-full h-full)
         this.detectionOverlay.width = containerRect.width;
         this.detectionOverlay.height = containerRect.height;
@@ -279,56 +304,33 @@ export class FoodDetectionController {
         // Clear previous drawings
         this.ctx.clearRect(0, 0, this.detectionOverlay.width, this.detectionOverlay.height);
 
-        // Calculate how the video is displayed within its container using object-contain logic
-        // object-contain: scales the video to maintain aspect ratio while fitting within container
-        const videoAspect = sourceWidth / sourceHeight;
-        const containerAspect = containerRect.width / containerRect.height;
-        
-        let videoDisplayWidth, videoDisplayHeight, videoOffsetX, videoOffsetY;
-        
-        if (videoAspect > containerAspect) {
-            // Video is wider than container - fits to width, pillarboxing on sides
-            videoDisplayWidth = containerRect.width;
-            videoDisplayHeight = containerRect.width / videoAspect;
-            videoOffsetX = 0;
-            videoOffsetY = (containerRect.height - videoDisplayHeight) / 2;
-        } else {
-            // Video is taller than container - fits to height, letterboxing on top/bottom
-            videoDisplayWidth = containerRect.height * videoAspect;
-            videoDisplayHeight = containerRect.height;
-            videoOffsetX = (containerRect.width - videoDisplayWidth) / 2;
-            videoOffsetY = 0;
-        }
-        
-        // Calculate scaling factors from source resolution to displayed video area
-        const scaleX = videoDisplayWidth / sourceWidth;
-        const scaleY = videoDisplayHeight / sourceHeight;
+        // Calculate scaling factors from source resolution to actual video content area
+        const scaleX = actualVideoWidth / sourceWidth;
+        const scaleY = actualVideoHeight / sourceHeight;
         
         // Debug logging
-        console.log('Detection overlay alignment (object-contain):', {
+        console.log('Detection overlay alignment (actual video content):', {
             sourceWidth,
             sourceHeight,
             containerWidth: containerRect.width,
             containerHeight: containerRect.height,
-            videoDisplayWidth,
-            videoDisplayHeight,
-            videoOffsetX,
-            videoOffsetY,
+            videoElementWidth: videoRect.width,
+            videoElementHeight: videoRect.height,
+            actualVideoWidth,
+            actualVideoHeight,
+            videoOffsetInElementX,
+            videoOffsetInElementY,
+            videoOffsetInContainerX,
+            videoOffsetInContainerY,
             scaleX,
             scaleY,
             videoAspect: videoAspect.toFixed(2),
-            containerAspect: containerAspect.toFixed(2),
-            videoElementRect: {
-                width: videoRect.width,
-                height: videoRect.height,
-                left: videoRect.left,
-                top: videoRect.top
-            }
+            videoElementAspect: videoElementAspect.toFixed(2)
         });
         
-        // Apply transformation to match the actual video display within the container
+        // Apply transformation to match the actual video content within the container
         this.ctx.save();
-        this.ctx.translate(videoOffsetX, videoOffsetY);
+        this.ctx.translate(videoOffsetInContainerX, videoOffsetInContainerY);
         this.ctx.scale(scaleX, scaleY);
 
         // Update detection info
