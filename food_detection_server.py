@@ -776,34 +776,30 @@ async def analyze_video_with_gemini(video_path):
             return
         
         # Analyze video content
-        analysis_prompt = """请详细分析这个视频中的人物，提供以下信息：
+        analysis_prompt = """请详细分析这个视频中的人物，并以JSON格式返回结果。
 
-1. **面部表情分析**：
-   - 主要情绪状态（快乐、悲伤、愤怒、惊讶、恐惧、厌恶、中性等）
-   - 情绪强度（1-10分）
-   - 表情变化描述
+请返回以下结构的JSON：
+{
+    "emotion_state": "主要情绪状态（快乐、悲伤、愤怒、惊讶、恐惧、厌恶、中性等）",
+    "emotion_intensity": "情绪强度（1-10分）",
+    "facial_expression": "面部表情变化描述",
+    "body_language": "姿态和动作描述",
+    "body_emotion": "身体语言传达的情绪",
+    "activity_level": "活动强度（低/中/高）",
+    "current_activity": "当前主要活动",
+    "environment_description": "环境描述",
+    "diet_status": "饮食状况与健康状况",
+    "overall_mental_state": "整体心理状态",
+    "attention_level": "注意力集中程度（高/中/低）",
+    "emotion_cause": "可能的情绪原因"
+}
 
-2. **肢体语言分析**：
-   - 姿态和动作描述
-   - 身体语言传达的情绪
-   - 活动强度（低/中/高）
-
-3. **环境与活动**：
-   - 当前主要活动
-   - 环境描述
-   - 饮食状况与Calorie与健康
-
-4. **综合情绪评估**：
-   - 整体心理状态
-   - 注意力集中程度
-   - 可能的情绪原因
-
-请用结构化的中文回答，每个部分详细描述。"""
+请确保返回的是有效的JSON格式，不要包含任何其他文本或说明。"""
         
         response = gemini_client.chat.completions.create(
             model="gemini-3-pro-preview",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant specialized in video analysis."},
+                {"role": "system", "content": "You are a helpful assistant specialized in video analysis. Always return valid JSON format."},
                 {
                     "role": "user",
                     "content": [
@@ -825,25 +821,55 @@ async def analyze_video_with_gemini(video_path):
         analysis_text = response.choices[0].message.content
         print(f'[GEMINI] Video analysis completed successfully')
         
-        # Parse detailed analysis and generate HTML
-        # Extract key information from the structured response
-        emotion_state = "未检测到"
-        emotion_intensity = "未知"
-        activity_level = "未知"
-        overall_state = "正常"
-        
-        # Parse the analysis text for key information
-        if "面部表情分析" in analysis_text:
-            lines = analysis_text.split('\n')
-            for i, line in enumerate(lines):
-                if "主要情绪状态" in line:
-                    emotion_state = line.split('：')[-1].strip() if '：' in line else emotion_state
-                elif "情绪强度" in line:
-                    emotion_intensity = line.split('：')[-1].strip() if '：' in line else emotion_intensity
-                elif "活动强度" in line:
-                    activity_level = line.split('：')[-1].strip() if '：' in line else activity_level
-                elif "整体心理状态" in line:
-                    overall_state = line.split('：')[-1].strip() if '：' in line else overall_state
+        # Parse JSON response
+        try:
+            # Try to extract JSON from the response
+            import json
+            import re
+            
+            # First, try to extract JSON from markdown code blocks
+            json_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+            json_match = re.search(json_pattern, analysis_text, re.DOTALL | re.IGNORECASE)
+            
+            if json_match:
+                # Extract JSON from markdown code block
+                json_str = json_match.group(1)
+                print(f'[GEMINI] Found JSON in markdown code block')
+            else:
+                # Try to find JSON object in the response (without markdown)
+                json_pattern = r'\{.*\}'
+                json_match = re.search(json_pattern, analysis_text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    print(f'[GEMINI] Found JSON object in response')
+                else:
+                    # Fallback: try to parse the entire response as JSON
+                    json_str = analysis_text.strip()
+                    print(f'[GEMINI] Parsing entire response as JSON')
+            
+            # Clean up the JSON string
+            json_str = json_str.strip()
+            
+            # Parse the JSON
+            video_analysis = json.loads(json_str)
+            
+            # Extract values from JSON with defaults
+            emotion_state = video_analysis.get('emotion_state', '未检测到')
+            emotion_intensity = video_analysis.get('emotion_intensity', '未知')
+            activity_level = video_analysis.get('activity_level', '未知')
+            overall_state = video_analysis.get('overall_mental_state', '正常')
+            
+            print(f'[GEMINI] Successfully parsed video analysis JSON: {emotion_state}, {activity_level}')
+            
+        except Exception as e:
+            print(f'[GEMINI] Error parsing video analysis JSON: {e}')
+            print(f'[GEMINI] Raw response: {analysis_text}')
+            
+            # Fallback values if JSON parsing fails
+            emotion_state = "解析失败"
+            emotion_intensity = "未知"
+            activity_level = "未知"
+            overall_state = "解析错误"
         
         # Generate comprehensive video detection text
         video_text = f"活动强度: {activity_level}\n心理状态: {overall_state}\n情绪强度: {emotion_intensity}\n分析时间: {datetime.now().strftime('%H:%M:%S')}"
@@ -933,6 +959,20 @@ async def generate_comprehensive_summary():
         emotion_history = analysis_results['emotion_history'][-10:]  # Last 10 emotion entries
         activity_history = analysis_results['activity_history'][-10:]  # Last 10 activity entries
         
+        # Check for eating activities in recent analyses
+        eating_activities = []
+        for activity in activity_history:
+            if any(keyword in activity['activity'].lower() for keyword in ['吃', '进食', '饮食', '食物', 'eating', 'meal', 'food']):
+                eating_activities.append(activity)
+        
+        # Check for diet-related content in video analyses
+        diet_related_videos = []
+        for video in recent_video:
+            if any(keyword in str(video.get('full_analysis', '')).lower() for keyword in ['吃', '进食', '饮食', '食物', 'eating', 'meal', 'food', 'diet']):
+                diet_related_videos.append(video)
+        
+        has_eating_activity = len(eating_activities) > 0 or len(diet_related_videos) > 0
+        
         # Build summary prompt
         summary_prompt = f"""基于以下分析结果，请生成一个综合性的用户状态总结：
 
@@ -947,6 +987,9 @@ async def generate_comprehensive_summary():
 
 ## 活动历史（最近{len(activity_history)}次）：
 {chr(10).join([f"- {a['timestamp']}: {a['source']} - {a['activity']}" for a in activity_history])}
+
+## 进食活动检测：
+{f"检测到 {len(eating_activities)} 次进食相关活动" if has_eating_activity else "未检测到进食活动"}
 
 请基于以上数据，提供以下总结：
 
@@ -971,11 +1014,17 @@ async def generate_comprehensive_summary():
    - 效率状态评估
 
 5. **建议和提醒**：
-   - 健康建议
+   - 健康建议{'（重点关注饮食健康和营养均衡）' if has_eating_activity else ''}
    - 工作效率建议
    - 情绪管理建议
 
-请用结构化的中文回答，每个部分详细分析并提供具体建议。每个部分只输出一句简短描述。"""
+{'''6. **饮食健康专项建议**：
+   - 进食时间规律性建议
+   - 营养搭配建议
+   - 健康饮食习惯建议
+   - 消化健康提醒''' if has_eating_activity else ''}
+
+请用结构化的中文回答，每个部分详细分析并提供具体建议。每个部分只输出一句简短描述。{'如果检测到进食活动，请在健康建议部分特别关注饮食健康和营养均衡。' if has_eating_activity else ''}"""
 
         # Generate summary using Gemini
         response = gemini_client.chat.completions.create(
@@ -1001,6 +1050,16 @@ def generate_mock_summary():
     emotion_states = ['专注', '平静', '积极', '放松', '投入']
     activity_levels = ['中等', '较高', '适中', '稳定']
     
+    # Check for eating activities in recent analyses
+    eating_activities = []
+    activity_history = analysis_results.get('activity_history', [])
+    for activity in activity_history[-10:]:  # Last 10 activities
+        if any(keyword in activity['activity'].lower() for keyword in ['吃', '进食', '饮食', '食物', 'eating', 'meal', 'food']):
+            eating_activities.append(activity)
+    
+    has_eating_activity = len(eating_activities) > 0
+    
+    # Generate base summary
     mock_summary = f"""
 ## 综合状态总结
 
@@ -1025,9 +1084,24 @@ def generate_mock_summary():
 - **效率状态评估**: 高效
 
 ### 5. 建议和提醒
-- **健康建议**: 定时休息，保护视力
+- **健康建议**: {'定时休息，注意饮食营养均衡，避免暴饮暴食，建议细嚼慢咽有助于消化健康' if has_eating_activity else '定时休息，保护视力'}
 - **工作效率建议**: 保持专注，适当调整
-- **情绪管理建议**: 保持积极心态
+- **情绪管理建议**: 保持积极心态"""
+    
+    # Add eating-specific advice if eating activity detected
+    if has_eating_activity:
+        mock_summary += f"""
+
+### 6. 饮食健康专项建议
+- **进食时间规律性建议**: 建议固定用餐时间，避免不规律进食
+- **营养搭配建议**: 注意荤素搭配，保证营养均衡
+- **健康饮食习惯建议**: 细嚼慢咽，避免边工作边进食
+- **消化健康提醒**: 饭后适当休息，有助于消化吸收
+
+## 进食活动检测
+检测到 {len(eating_activities)} 次进食相关活动，建议关注饮食健康和营养均衡。"""
+    
+    mock_summary += """
 
 *注：此为模拟总结，实际分析需要更多数据*
 """
@@ -1092,39 +1166,31 @@ async def analyze_audio_with_gemini(audio_path):
             return
         
         # Transcribe and analyze audio content
-        analysis_prompt = """请详细分析这段音频中的语音和声音，提供以下信息：
+        analysis_prompt = """请详细分析这段音频中的语音和声音，并以JSON格式返回结果。
 
-1. **语音内容分析**：
-   - 完整转录文本
-   - 语言和口音特征
-   - 语速和流畅度
+请返回以下结构的JSON：
+{
+    "speech_content": "完整的语音转录文本",
+    "emotion_state": "主要情绪状态（快乐、悲伤、愤怒、焦虑、兴奋、平静等）",
+    "emotion_intensity": "情绪强度（1-10分）",
+    "volume_level": "音量水平（低/中/高）",
+    "voice_quality": "声音清晰度（清晰/一般/模糊）",
+    "language_feature": "语言和口音特征",
+    "speech_speed": "语速（慢/正常/快）",
+    "tone_analysis": "语调变化和情感色彩",
+    "background_noise": "背景噪音描述",
+    "audio_quality": "音频质量评估",
+    "psychological_state": "说话者心理状态推断",
+    "emotional_stability": "情绪稳定性（稳定/一般/不稳定）",
+    "emotion_triggers": "可能的情绪触发因素"
+}
 
-2. **声音情绪分析**：
-   - 主要情绪状态（快乐、悲伤、愤怒、焦虑、兴奋、平静等）
-   - 情绪强度（1-10分）
-   - 语调变化和情感色彩
-
-3. **声音特征**：
-   - 音量水平（低/中/高）
-   - 音调高低
-   - 声音清晰度
-
-4. **环境声音**：
-   - 背景噪音描述
-   - 环境音效
-   - 音频质量评估
-
-5. **综合心理状态**：
-   - 说话者心理状态推断
-   - 情绪稳定性
-   - 可能的情绪触发因素
-
-请用结构化的中文回答，每个部分详细分析。"""
+请确保返回的是有效的JSON格式，不要包含任何其他文本或说明。"""
         
         response = gemini_client.chat.completions.create(
             model="gemini-3-pro-preview",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant specialized in audio analysis."},
+                {"role": "system", "content": "You are a helpful assistant specialized in audio analysis. Always return valid JSON format."},
                 {
                     "role": "user",
                     "content": [
@@ -1146,31 +1212,61 @@ async def analyze_audio_with_gemini(audio_path):
         analysis_text = response.choices[0].message.content
         print(f'[GEMINI] Audio analysis completed successfully, {analysis_text}')
         
-        # Parse detailed analysis and generate HTML
-        # Extract key information from the structured response
-        speech_content = "无语音"
-        emotion_state = "未检测到"
-        emotion_intensity = "未知"
-        volume_level = "未知"
-        voice_quality = "正常"
-        
-        # Parse the analysis text for key information
-        if "语音内容分析" in analysis_text or "声音情绪分析" in analysis_text:
-            lines = analysis_text.split('\n')
-            for i, line in enumerate(lines):
-                if "转录文本" in line or "完整转录文本" in line:
-                    speech_content = line.split('：')[-1].strip() if '：' in line else speech_content
-                    # Limit transcript length for display
-                    if len(speech_content) > 50:
-                        speech_content = speech_content[:50] + "..."
-                elif "主要情绪状态" in line:
-                    emotion_state = line.split('：')[-1].strip() if '：' in line else emotion_state
-                elif "情绪强度" in line:
-                    emotion_intensity = line.split('：')[-1].strip() if '：' in line else emotion_intensity
-                elif "音量水平" in line:
-                    volume_level = line.split('：')[-1].strip() if '：' in line else volume_level
-                elif "声音清晰度" in line:
-                    voice_quality = line.split('：')[-1].strip() if '：' in line else voice_quality
+        # Parse JSON response
+        try:
+            # Try to extract JSON from the response
+            import json
+            import re
+            
+            # First, try to extract JSON from markdown code blocks
+            json_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+            json_match = re.search(json_pattern, analysis_text, re.DOTALL | re.IGNORECASE)
+            
+            if json_match:
+                # Extract JSON from markdown code block
+                json_str = json_match.group(1)
+                print(f'[GEMINI] Found JSON in markdown code block')
+            else:
+                # Try to find JSON object in the response (without markdown)
+                json_pattern = r'\{.*\}'
+                json_match = re.search(json_pattern, analysis_text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    print(f'[GEMINI] Found JSON object in response')
+                else:
+                    # Fallback: try to parse the entire response as JSON
+                    json_str = analysis_text.strip()
+                    print(f'[GEMINI] Parsing entire response as JSON')
+            
+            # Clean up the JSON string
+            json_str = json_str.strip()
+            
+            # Parse the JSON
+            audio_analysis = json.loads(json_str)
+            
+            # Extract values from JSON with defaults
+            speech_content = audio_analysis.get('speech_content', '无语音')
+            emotion_state = audio_analysis.get('emotion_state', '未检测到')
+            emotion_intensity = audio_analysis.get('emotion_intensity', '未知')
+            volume_level = audio_analysis.get('volume_level', '未知')
+            voice_quality = audio_analysis.get('voice_quality', '正常')
+            
+            # Limit transcript length for display
+            if len(speech_content) > 50:
+                speech_content = speech_content[:50] + "..."
+                
+            print(f'[GEMINI] Successfully parsed audio analysis JSON: {emotion_state}, {volume_level}')
+            
+        except Exception as e:
+            print(f'[GEMINI] Error parsing audio analysis JSON: {e}')
+            print(f'[GEMINI] Raw response: {analysis_text}')
+            
+            # Fallback values if JSON parsing fails
+            speech_content = "解析失败"
+            emotion_state = "未检测到"
+            emotion_intensity = "未知"
+            volume_level = "未知"
+            voice_quality = "解析错误"
         
         # Generate comprehensive audio detection text
         audio_text = f"语音内容: {speech_content}\n情绪状态: {emotion_state}\n音量: {volume_level}\n音质: {voice_quality}\n分析时间: {datetime.now().strftime('%H:%M:%S')}"

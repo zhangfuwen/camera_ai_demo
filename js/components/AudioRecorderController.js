@@ -14,6 +14,8 @@ export class AudioRecorderController {
         this.recordingDuration = 10000; // 10 seconds
         this.uploadEndpoint = '/upload_audio';
         this.audioStream = null;
+        this.audioDevices = [];
+        this.selectedAudioDeviceId = null;
     }
 
     /**
@@ -23,6 +25,7 @@ export class AudioRecorderController {
         console.log('Initializing Audio Recorder Controller...');
         this.setupEventListeners();
         this.updateUI();
+        this.getAudioDevices();
     }
 
     /**
@@ -37,6 +40,88 @@ export class AudioRecorderController {
         document.addEventListener('saveRecordedAudio', () => {
             this.saveRecordedAudio();
         });
+
+        // Audio source selection
+        const audioSourceSelect = document.getElementById('audio-source-select');
+        if (audioSourceSelect) {
+            audioSourceSelect.addEventListener('change', (e) => {
+                this.selectedAudioDeviceId = e.target.value;
+                console.log('Selected audio device:', this.selectedAudioDeviceId);
+            });
+        }
+
+        // Refresh audio sources button
+        const refreshBtn = document.getElementById('refresh-audio-sources-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.getAudioDevices();
+            });
+        }
+    }
+
+    /**
+     * Get available audio devices
+     */
+    async getAudioDevices() {
+        try {
+            console.log('Getting audio devices...');
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            
+            // Filter audio input devices
+            this.audioDevices = devices.filter(device => device.kind === 'audioinput');
+            
+            console.log('Found audio devices:', this.audioDevices);
+            
+            // Update UI with device list
+            this.updateAudioDeviceList();
+            
+        } catch (error) {
+            console.error('Error getting audio devices:', error);
+            this.addUploadLog('Error getting audio devices: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * Update audio device list in UI
+     */
+    updateAudioDeviceList() {
+        const audioSourceSelect = document.getElementById('audio-source-select');
+        const refreshBtn = document.getElementById('refresh-audio-sources-btn');
+        
+        if (audioSourceSelect) {
+            // Clear existing options
+            audioSourceSelect.innerHTML = '<option value="">-- Select an audio source --</option>';
+            
+            // Add device options
+            this.audioDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Microphone ${index + 1}`;
+                audioSourceSelect.appendChild(option);
+            });
+            
+            // Enable the select if devices are available
+            audioSourceSelect.disabled = this.audioDevices.length === 0;
+            
+            // Auto-select first device if none selected
+            if (this.audioDevices.length > 0 && !this.selectedAudioDeviceId) {
+                this.selectedAudioDeviceId = this.audioDevices[0].deviceId;
+                audioSourceSelect.value = this.selectedAudioDeviceId;
+            }
+        }
+        
+        // Enable refresh button
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+        }
+        
+        // Enable record button if we have devices
+        const recordBtn = document.getElementById('record-audio-btn');
+        if (recordBtn) {
+            recordBtn.disabled = this.audioDevices.length === 0;
+        }
+        
+        this.addUploadLog(`Found ${this.audioDevices.length} audio device(s)`, 'info');
     }
 
     /**
@@ -55,16 +140,24 @@ export class AudioRecorderController {
      */
     async startRecording() {
         try {
-            // Request microphone access
-            console.log('Requesting microphone access...');
-            this.audioStream = await navigator.mediaDevices.getUserMedia({ 
+            if (!this.selectedAudioDeviceId) {
+                throw new Error('No audio device selected');
+            }
+            
+            // Request microphone access with specific device
+            console.log('Requesting microphone access for device:', this.selectedAudioDeviceId);
+            
+            const constraints = {
                 audio: {
+                    deviceId: this.selectedAudioDeviceId ? { exact: this.selectedAudioDeviceId } : undefined,
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true,
                     sampleRate: 44100
-                } 
-            });
+                }
+            };
+            
+            this.audioStream = await navigator.mediaDevices.getUserMedia(constraints);
             
             console.log('Microphone access granted');
             
