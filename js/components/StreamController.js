@@ -90,6 +90,7 @@ export class StreamController {
                     this.updateStatusOverlay('#voice-info-container', data.content);
                     break;
                 case 'video_detect':
+                    this.logger.info('Received video_detect message:', data.content);
                     this.updateStatusOverlay('#food-info-container', data.content);
                     break;
                 case 'overall_status':

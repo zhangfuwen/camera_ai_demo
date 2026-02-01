@@ -2,6 +2,8 @@
  * Video Recorder Controller
  * Handles recording video from #main-video element every 10 seconds and uploading to server
  */
+import { Logger } from '../utils/logger.js';
+
 export class VideoRecorderController {
     constructor() {
         this.mediaRecorder = null;
@@ -13,13 +15,15 @@ export class VideoRecorderController {
         this.isUploading = false;
         this.recordingDuration = 10000; // 10 seconds
         this.uploadEndpoint = '/upload_video';
+        this.videoStream = null;
+        this.logger = new Logger('VideoRecorderController', 'INFO');
     }
 
     /**
      * Initialize the video recorder controller
      */
     initialize() {
-        console.log('Initializing Video Recorder Controller...');
+        this.logger.info('Initializing Video Recorder Controller...');
         this.setupEventListeners();
         this.updateUI();
     }
@@ -31,10 +35,6 @@ export class VideoRecorderController {
         // Listen for custom events
         document.addEventListener('toggleVideoRecording', () => {
             this.toggleRecording();
-        });
-
-        document.addEventListener('saveRecordedVideo', () => {
-            this.saveRecordedVideo();
         });
     }
 
@@ -60,11 +60,13 @@ export class VideoRecorderController {
             }
 
             // Get the video stream
-            const stream = videoElement.srcObject;
+            this.videoStream = videoElement.srcObject;
+            
+            this.logger.debug('Starting video recording from main-video element');
             
             // Create MediaRecorder instance
-            this.mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/mp4'
+            this.mediaRecorder = new MediaRecorder(this.videoStream, {
+                mimeType: 'video/webm;codecs=vp9'
             });
 
             // Set up event handlers
@@ -84,9 +86,10 @@ export class VideoRecorderController {
             this.recordingStartTime = Date.now();
             this.isRecording = true;
 
-            console.log('Video recording started');
+            this.logger.info('Video recording started');
             this.updateUI();
             this.updateStatus('Video recording: Active');
+            this.addUploadLog('Video recording started', 'success');
 
             // Set up interval to process recordings every 10 seconds
             this.recordingInterval = setInterval(() => {
@@ -94,8 +97,9 @@ export class VideoRecorderController {
             }, this.recordingDuration);
 
         } catch (error) {
-            console.error('Error starting video recording:', error);
+            this.logger.error('Error starting video recording:', error);
             this.updateStatus('Error starting recording: ' + error.message);
+            this.addUploadLog(`❌ Error starting recording: ${error.message}`, 'error');
         }
     }
 
@@ -103,7 +107,7 @@ export class VideoRecorderController {
      * Stop video recording
      */
     stopRecording() {
-        console.log('Stopping video recording...');
+        this.logger.info('Stopping video recording...');
         
         // Clear the recording interval first
         if (this.recordingInterval) {
@@ -113,27 +117,28 @@ export class VideoRecorderController {
 
         // Stop the MediaRecorder but NOT the stream
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            console.log('Stopping MediaRecorder...');
+            this.logger.debug('Stopping MediaRecorder...');
             this.mediaRecorder.stop();
             // Don't touch the stream - let it continue for the main video
         }
 
         this.isRecording = false;
-        console.log('Video recording stopped - main camera stream should continue');
+        this.logger.info('Video recording stopped - main camera stream should continue');
         
         // Verify that the main video stream is still active
         setTimeout(() => {
             if (this.verifyMainVideoStream()) {
-                console.log('✅ Main camera stream confirmed active after recording stop');
+                this.logger.info('Main camera stream confirmed active after recording stop');
                 this.addUploadLog('Recording stopped - camera stream active', 'success');
             } else {
-                console.error('❌ Main camera stream may have been affected');
+                this.logger.error('Main camera stream may have been affected');
                 this.addUploadLog('⚠️ Recording stopped - camera stream issue detected', 'error');
             }
         }, 500); // Small delay to allow stream to stabilize
         
         this.updateUI();
         this.updateStatus('Video recording: Stopped');
+        this.addUploadLog('Video recording stopped', 'info');
     }
 
     /**
@@ -141,7 +146,7 @@ export class VideoRecorderController {
      */
     processCurrentRecording() {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-            console.log('Processing current recording chunk...');
+            this.logger.debug('Processing current recording chunk...');
             
             // Stop current MediaRecorder only (not the stream)
             this.mediaRecorder.stop();
@@ -161,17 +166,17 @@ export class VideoRecorderController {
     startNewRecordingChunk() {
         const videoElement = document.getElementById('main-video');
         if (!videoElement || !videoElement.srcObject) {
-            console.error('No video stream available for new recording chunk');
+            this.logger.error('No video stream available for new recording chunk');
             return;
         }
 
         // Get the existing stream - don't create a new one
         const stream = videoElement.srcObject;
-        console.log('Starting new recording chunk from existing stream');
+        this.logger.debug('Starting new recording chunk from existing stream');
         
         // Create new MediaRecorder instance using the same stream
         this.mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/mp4'
+            mimeType: 'video/webm;codecs=vp9'
         });
 
         this.mediaRecorder.ondataavailable = (event) => {
@@ -187,7 +192,7 @@ export class VideoRecorderController {
         this.recordedChunks = [];
         this.mediaRecorder.start();
         this.recordingStartTime = Date.now();
-        console.log('New recording chunk started');
+        this.logger.debug('New recording chunk started');
     }
 
     /**
@@ -199,11 +204,11 @@ export class VideoRecorderController {
         }
 
         // Create blob from recorded chunks
-        const blob = new Blob(this.recordedChunks, { type: 'video/mp4' });
+        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
         
         // Create timestamp for filename
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `video_${timestamp}.mp4`;
+        const filename = `video_${timestamp}.webm`;
 
         // Add to upload queue
         this.uploadQueue.push({
@@ -212,7 +217,8 @@ export class VideoRecorderController {
             timestamp: timestamp
         });
 
-        console.log(`Video chunk recorded: ${filename}`);
+        this.logger.debug(`Video chunk recorded: ${filename}`);
+        this.addUploadLog(`Video recorded: ${filename} (${(blob.size / 1024 / 1024).toFixed(1)} MB)`, 'info');
         
         // Process upload queue
         this.processUploadQueue();
@@ -359,10 +365,10 @@ export class VideoRecorderController {
      * Create upload log container in the UI
      */
     createUploadLogContainer() {
-        // Find the video recorder section
-        const videoRecorderSection = document.querySelector('#record-video-btn').closest('.accordion-content');
+        // Find the video recorder section - look for the parent div with the video recorder content
+        const videoRecorderSection = document.querySelector('#record-video-btn').closest('.mb-6');
         if (!videoRecorderSection) {
-            console.error('Could not find video recorder section for log container');
+            this.logger.error('Could not find video recorder section for log container');
             return null;
         }
 
@@ -416,39 +422,10 @@ export class VideoRecorderController {
     }
 
     /**
-     * Save recorded video locally
-     */
-    async saveRecordedVideo() {
-        if (this.recordedChunks.length === 0) {
-            this.updateStatus('No recorded video to save');
-            return;
-        }
-
-        try {
-            const blob = new Blob(this.recordedChunks, { type: 'video/mp4' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `recorded_video_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            this.updateStatus('Video saved locally');
-        } catch (error) {
-            console.error('Error saving video:', error);
-            this.updateStatus('Error saving video: ' + error.message);
-        }
-    }
-
-    /**
      * Update UI elements
      */
     updateUI() {
         const recordBtn = document.getElementById('record-video-btn');
-        const saveBtn = document.getElementById('save-recorded-video-btn');
         const statusDiv = document.getElementById('recording-status');
 
         if (recordBtn) {
@@ -473,10 +450,6 @@ export class VideoRecorderController {
             }
             
             recordBtn.disabled = false;
-        }
-
-        if (saveBtn) {
-            saveBtn.disabled = this.recordedChunks.length === 0;
         }
 
         if (statusDiv) {

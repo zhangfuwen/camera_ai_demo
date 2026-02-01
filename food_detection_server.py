@@ -1082,7 +1082,7 @@ async def analyze_video_with_gemini(video_path):
         )
         
         analysis_text = response.choices[0].message.content
-        print(f'[GEMINI] Video analysis completed successfully')
+        log_info(f'[GEMINI] Video analysis completed successfully')
         
         # Parse JSON response
         try:
@@ -1122,11 +1122,11 @@ async def analyze_video_with_gemini(video_path):
             activity_level = video_analysis.get('activity_level', '未知')
             overall_state = video_analysis.get('overall_mental_state', '正常')
             
-            print(f'[GEMINI] Successfully parsed video analysis JSON: {emotion_state}, {activity_level}')
+            log_info(f'[GEMINI] Successfully parsed video analysis JSON: {emotion_state}, {activity_level}')
             
         except Exception as e:
-            print(f'[GEMINI] Error parsing video analysis JSON: {e}')
-            print(f'[GEMINI] Raw response: {analysis_text}')
+            log_error(f'[GEMINI] Error parsing video analysis JSON: {e}')
+            log_error(f'[GEMINI] Raw response: {analysis_text}')
             
             # Fallback values if JSON parsing fails
             emotion_state = "解析失败"
@@ -1216,7 +1216,7 @@ async def analyze_video_with_gemini(video_path):
         
         # Add to storage with size limit
         analysis_results['video_analysis'].append(video_result)
-        print(f'[STORAGE] Stored video analysis result: {analysis_results["video_analysis"][-1]}')
+        log_info(f'[STORAGE] Stored video analysis result: {analysis_results["video_analysis"][-1]}')
         if len(analysis_results['video_analysis']) > MAX_STORED_RESULTS:
             analysis_results['video_analysis'].pop(0)
         
@@ -1243,11 +1243,11 @@ async def analyze_video_with_gemini(video_path):
         if len(analysis_results['activity_history']) > MAX_STORED_RESULTS:
             analysis_results['activity_history'].pop(0)
         
-        print(f'[STORAGE] Stored video analysis results. Total stored: {len(analysis_results["video_analysis"])}')
-        print(f'[GEMINI] Video analysis completed for: {video_path}')
+        log_info(f'[STORAGE] Stored video analysis results. Total stored: {len(analysis_results["video_analysis"])}')
+        log_info(f'[GEMINI] Video analysis completed for: {video_path}')
         
     except Exception as e:
-        print(f'[GEMINI] Error analyzing video: {e}')
+        log_error(f'[GEMINI] Error analyzing video: {e}')
         # Fallback to mock data
         html_content = generate_video_detection_html()
         broadcast_to_clients('video_detect', html_content)
