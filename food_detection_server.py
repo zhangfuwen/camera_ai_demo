@@ -972,25 +972,6 @@ def overall_status_timer():
             log_warning(f'[STREAM] Error in overall status timer: {e}')
             time.sleep(20)
 
-def comprehensive_summary_timer():
-    """Timer for generating comprehensive summaries every 5 minutes"""
-    while True:
-        try:
-            log_info('[SUMMARY] Starting comprehensive summary generation...')
-            # Generate comprehensive summary using stored analysis results
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                summary_text = loop.run_until_complete(generate_comprehensive_summary())
-                summary_html = generate_summary_html(summary_text)
-                broadcast_to_clients('overall_status', summary_html)
-                log_info('[SUMMARY] Comprehensive summary generated and broadcasted')
-            finally:
-                loop.close()
-            time.sleep(300)  # 5 minutes
-        except Exception as e:
-            log_error(f'[SUMMARY] Error in comprehensive summary timer: {e}')
-            time.sleep(300)
 
 async def analyze_video_with_gemini(video_path):
     """Analyze video using Gemini model"""
@@ -1255,19 +1236,19 @@ async def analyze_video_with_gemini(video_path):
         broadcast_to_clients('emotion_update', emotion_html)
 
 async def generate_comprehensive_summary():
-    """Generate comprehensive summary using stored analysis results"""
+    """Generate comprehensive summary using stored analysis results in JSON format"""
     try:
         if not gemini_client:
-            print('[SUMMARY] Gemini client not available, using fallback')
-            return generate_mock_summary()
+            log_info('[SUMMARY] Gemini client not available, using fallback')
+            return generate_mock_summary_json()
         
         # Check if we have enough data for meaningful summary
         total_analyses = len(analysis_results['video_analysis']) + len(analysis_results['audio_analysis'])
         if total_analyses < 2:
-            print('[SUMMARY] Insufficient data for comprehensive summary')
-            return generate_mock_summary()
+            log_info('[SUMMARY] Insufficient data for comprehensive summary')
+            return generate_mock_summary_json()
         
-        print(f'[SUMMARY] Generating comprehensive summary from {total_analyses} analyses')
+        log_info(f'[SUMMARY] Generating comprehensive summary from {total_analyses} analyses')
         
         # Prepare data for summary
         recent_video = analysis_results['video_analysis'][-5:]  # Last 5 video analyses
@@ -1290,7 +1271,7 @@ async def generate_comprehensive_summary():
         has_eating_activity = len(eating_activities) > 0 or len(diet_related_videos) > 0
         
         # Build summary prompt
-        summary_prompt = f"""基于以下分析结果，请生成一个综合性的用户状态总结：
+        summary_prompt = f"""基于以下分析结果，请生成一个综合性的用户状态总结，并以JSON格式返回：
 
 ## 视频分析结果（最近{len(recent_video)}次）：
 {chr(10).join([f"- {v['timestamp']}: 情绪={v['emotion_state']}, 强度={v['emotion_intensity']}, 状态={v['overall_state']}" for v in recent_video])}
@@ -1307,40 +1288,36 @@ async def generate_comprehensive_summary():
 ## 进食活动检测：
 {f"检测到 {len(eating_activities)} 次进食相关活动" if has_eating_activity else "未检测到进食活动"}
 
-请基于以上数据，提供以下总结：
+请返回以下JSON结构：
+{{
+    "emotion_trend_analysis": {{
+        "main_emotion_pattern": "主要情绪模式",
+        "emotion_change_trend": "情绪变化趋势",
+        "emotion_stability_assessment": "情绪稳定性评估"
+    }},
+    "activity_pattern_analysis": {{
+        "main_activity_type": "主要活动类型",
+        "activity_intensity_change": "活动强度变化",
+        "work_rest_balance": "工作/休息平衡"
+    }},
+    "communication_pattern_analysis": {{
+        "voice_activity_frequency": "语音活动频率",
+        "communication_emotion_features": "沟通情绪特征",
+        "expression_style_characteristics": "表达方式特点"
+    }},
+    "comprehensive_status_assessment": {{
+        "current_overall_status": "当前整体状态",
+        "stress_level_assessment": "压力水平评估",
+        "efficiency_status_assessment": "效率状态评估"
+    }},
+    "suggestions_and_reminders": {{
+        "health_suggestions": "健康建议（重点关注饮食健康和营养均衡）" if has_eating_activity else "健康建议",
+        "work_efficiency_suggestions": "工作效率建议",
+        "emotion_management_suggestions": "情绪管理建议"
+    }}{', "diet_health_specific_suggestions": {{"eating_time_regularity_suggestions": "进食时间规律性建议", "nutrition_matching_suggestions": "营养搭配建议", "healthy_eating_habit_suggestions": "健康饮食习惯建议", "digestive_health_reminders": "消化健康提醒"}}' if has_eating_activity else ''}
+}}
 
-1. **整体情绪趋势分析**：
-   - 主要情绪模式
-   - 情绪变化趋势
-   - 情绪稳定性评估
-
-2. **活动模式分析**：
-   - 主要活动类型
-   - 活动强度变化
-   - 工作/休息平衡
-
-3. **沟通模式分析**：
-   - 语音活动频率
-   - 沟通情绪特征
-   - 表达方式特点
-
-4. **综合状态评估**：
-   - 当前整体状态
-   - 压力水平评估
-   - 效率状态评估
-
-5. **建议和提醒**：
-   - 健康建议{'（重点关注饮食健康和营养均衡）' if has_eating_activity else ''}
-   - 工作效率建议
-   - 情绪管理建议
-
-{'''6. **饮食健康专项建议**：
-   - 进食时间规律性建议
-   - 营养搭配建议
-   - 健康饮食习惯建议
-   - 消化健康提醒''' if has_eating_activity else ''}
-
-请用结构化的中文回答，每个部分详细分析并提供具体建议。每个部分只输出一句简短描述。{'如果检测到进食活动，请在健康建议部分特别关注饮食健康和营养均衡。' if has_eating_activity else ''}"""
+请确保返回有效的JSON格式，每个值只输出一句简短描述。{'如果检测到进食活动，请在健康建议部分特别关注饮食健康和营养均衡。' if has_eating_activity else ''}"""
 
         # Generate summary using Gemini
         response = gemini_client.chat.completions.create(
@@ -1351,16 +1328,57 @@ async def generate_comprehensive_summary():
         )
         
         summary_text = response.choices[0].message.content
-        print(f'[SUMMARY] Comprehensive summary generated successfully')
+        log_info(f'[SUMMARY] Comprehensive summary generated successfully')
         
-        return summary_text
+        # Parse JSON response
+        try:
+            import json
+            import re
+            
+            # Try to extract JSON from the response
+            json_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+            json_match = re.search(json_pattern, summary_text, re.DOTALL | re.IGNORECASE)
+            
+            if json_match:
+                json_str = json_match.group(1)
+                log_debug('[SUMMARY] Found JSON in markdown code block')
+            else:
+                json_pattern = r'\{.*\}'
+                json_match = re.search(json_pattern, summary_text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    log_debug('[SUMMARY] Found JSON object in response')
+                else:
+                    json_str = summary_text.strip()
+                    log_debug('[SUMMARY] Parsing entire response as JSON')
+            
+            json_str = json_str.strip()
+            summary_data = json.loads(json_str)
+            
+            # Add metadata
+            summary_data['metadata'] = {
+                'generated_at': datetime.now().isoformat(),
+                'total_analyses': total_analyses,
+                'video_analyses_count': len(recent_video),
+                'audio_analyses_count': len(recent_audio),
+                'has_eating_activity': has_eating_activity,
+                'eating_activities_count': len(eating_activities)
+            }
+            
+            log_info(f'[SUMMARY] Successfully parsed summary JSON')
+            return summary_data
+            
+        except Exception as e:
+            log_error(f'[SUMMARY] Error parsing summary JSON: {e}')
+            log_error(f'[SUMMARY] Raw response: {summary_text}')
+            return generate_mock_summary_json()
         
     except Exception as e:
-        print(f'[SUMMARY] Error generating comprehensive summary: {e}')
-        return generate_mock_summary()
+        log_info(f'[SUMMARY] Error generating comprehensive summary: {e}')
+        return generate_mock_summary_json()
 
-def generate_mock_summary():
-    """Generate mock summary when Gemini is unavailable"""
+def generate_mock_summary_json():
+    """Generate mock summary JSON when Gemini is unavailable"""
     import random
     
     emotion_states = ['专注', '平静', '积极', '放松', '投入']
@@ -1375,80 +1393,366 @@ def generate_mock_summary():
     
     has_eating_activity = len(eating_activities) > 0
     
-    # Generate base summary
-    mock_summary = f"""
-## 综合状态总结
-
-### 1. 整体情绪趋势分析
-- **主要情绪模式**: {random.choice(emotion_states)}
-- **情绪变化趋势**: 情绪状态相对稳定
-- **情绪稳定性评估**: 良好
-
-### 2. 活动模式分析
-- **主要活动类型**: 电脑工作
-- **活动强度变化**: {random.choice(activity_levels)}
-- **工作/休息平衡**: 需要注意适当休息
-
-### 3. 沟通模式分析
-- **语音活动频率**: 适中
-- **沟通情绪特征**: 积极正面
-- **表达方式特点**: 清晰流畅
-
-### 4. 综合状态评估
-- **当前整体状态**: 良好
-- **压力水平评估**: 中等
-- **效率状态评估**: 高效
-
-### 5. 建议和提醒
-- **健康建议**: {'定时休息，注意饮食营养均衡，避免暴饮暴食，建议细嚼慢咽有助于消化健康' if has_eating_activity else '定时休息，保护视力'}
-- **工作效率建议**: 保持专注，适当调整
-- **情绪管理建议**: 保持积极心态"""
+    # Generate base summary JSON
+    mock_summary = {
+        "emotion_trend_analysis": {
+            "main_emotion_pattern": random.choice(emotion_states),
+            "emotion_change_trend": "情绪状态相对稳定",
+            "emotion_stability_assessment": "良好"
+        },
+        "activity_pattern_analysis": {
+            "main_activity_type": "电脑工作",
+            "activity_intensity_change": random.choice(activity_levels),
+            "work_rest_balance": "需要注意适当休息"
+        },
+        "communication_pattern_analysis": {
+            "voice_activity_frequency": "适中",
+            "communication_emotion_features": "积极正面",
+            "expression_style_characteristics": "清晰流畅"
+        },
+        "comprehensive_status_assessment": {
+            "current_overall_status": "良好",
+            "stress_level_assessment": "中等",
+            "efficiency_status_assessment": "高效"
+        },
+        "suggestions_and_reminders": {
+            "health_suggestions": "定时休息，保护视力" if not has_eating_activity else "定时休息，注意饮食营养均衡，避免暴饮暴食，建议细嚼慢咽有助于消化健康",
+            "work_efficiency_suggestions": "保持专注，适当调整",
+            "emotion_management_suggestions": "保持积极心态"
+        },
+        "metadata": {
+            "generated_at": datetime.now().isoformat(),
+            "total_analyses": len(analysis_results.get('video_analysis', [])) + len(analysis_results.get('audio_analysis', [])),
+            "video_analyses_count": len(analysis_results.get('video_analysis', [])),
+            "audio_analyses_count": len(analysis_results.get('audio_analysis', [])),
+            "has_eating_activity": has_eating_activity,
+            "eating_activities_count": len(eating_activities),
+            "is_mock": True
+        }
+    }
     
     # Add eating-specific advice if eating activity detected
     if has_eating_activity:
-        mock_summary += f"""
-
-### 6. 饮食健康专项建议
-- **进食时间规律性建议**: 建议固定用餐时间，避免不规律进食
-- **营养搭配建议**: 注意荤素搭配，保证营养均衡
-- **健康饮食习惯建议**: 细嚼慢咽，避免边工作边进食
-- **消化健康提醒**: 饭后适当休息，有助于消化吸收
-
-## 进食活动检测
-检测到 {len(eating_activities)} 次进食相关活动，建议关注饮食健康和营养均衡。"""
-    
-    mock_summary += """
-
-*注：此为模拟总结，实际分析需要更多数据*
-"""
+        mock_summary["diet_health_specific_suggestions"] = {
+            "eating_time_regularity_suggestions": "建议固定用餐时间，避免不规律进食",
+            "nutrition_matching_suggestions": "注意荤素搭配，保证营养均衡",
+            "healthy_eating_habit_suggestions": "细嚼慢咽，避免边工作边进食",
+            "digestive_health_reminders": "饭后适当休息，有助于消化吸收"
+        }
     
     return mock_summary
 
-def generate_summary_html(summary_text):
-    """Generate plain text for summary display"""
-    # Convert markdown-style headers to plain text
-    import re
+def generate_summary_html(summary_data):
+    """Generate HTML for summary display from JSON data"""
+    if isinstance(summary_data, str):
+        # Handle legacy string input
+        return f"""
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center mb-4">
+                <svg class="w-6 h-6 mr-2 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z"/>
+                </svg>
+                <h3 class="text-lg font-bold text-white">综合状态总结</h3>
+            </div>
+            <p class="text-gray-400 text-sm mb-4">生成时间: {datetime.now().strftime('%H:%M:%S')}</p>
+            <div class="text-gray-300 whitespace-pre-wrap">{summary_data}</div>
+        </div>
+        """
     
-    # Convert headers to plain text with separators
-    summary_text = re.sub(r'^### (.*?)$', r'---\n\1\n---', summary_text, flags=re.MULTILINE)
-    summary_text = re.sub(r'^## (.*?)$', r'===\n\1\n===', summary_text, flags=re.MULTILINE)
-    summary_text = re.sub(r'^# (.*?)$', r'***\n\1\n***', summary_text, flags=re.MULTILINE)
+    # Generate HTML from JSON data
+    html_sections = []
     
-    # Convert bold text to plain text
-    summary_text = re.sub(r'\*\*(.*?)\*\*', r'\1', summary_text)
+    # Header
+    html_sections.append(f"""
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-lg">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+                <svg class="w-6 h-6 mr-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z"/>
+                </svg>
+                <h3 class="text-xl font-bold text-white">综合状态总结</h3>
+            </div>
+            <span class="text-sm text-gray-400">{datetime.now().strftime('%H:%M:%S')}</span>
+        </div>
+    """)
     
-    # Convert list items to plain text with bullets
-    summary_text = re.sub(r'^- (.*?)$', r'• \1', summary_text, flags=re.MULTILINE)
+    # Emotion Trend Analysis
+    if 'emotion_trend_analysis' in summary_data:
+        emotion = summary_data['emotion_trend_analysis']
+        html_sections.append(f"""
+        <div class="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">整体情绪趋势分析</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">主要情绪模式</p>
+                        <p class="text-white font-medium">{emotion.get('main_emotion_pattern', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">情绪变化趋势</p>
+                        <p class="text-white font-medium">{emotion.get('emotion_change_trend', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-yellow-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">情绪稳定性评估</p>
+                        <p class="text-white font-medium">{emotion.get('emotion_stability_assessment', '未知')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """)
     
-    # Clean up extra line breaks
-    summary_text = re.sub(r'\n{3,}', '\n\n', summary_text)
+    # Activity Pattern Analysis
+    if 'activity_pattern_analysis' in summary_data:
+        activity = summary_data['activity_pattern_analysis']
+        html_sections.append(f"""
+        <div class="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">活动模式分析</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">主要活动类型</p>
+                        <p class="text-white font-medium">{activity.get('main_activity_type', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">活动强度变化</p>
+                        <p class="text-white font-medium">{activity.get('activity_intensity_change', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-yellow-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">工作/休息平衡</p>
+                        <p class="text-white font-medium">{activity.get('work_rest_balance', '未知')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """)
     
-    # Wrap in container with simple format
-    text_content = f"""📊 综合状态总结
-生成时间: {datetime.now().strftime('%H:%M:%S')}
-{summary_text}"""
+    # Communication Pattern Analysis
+    if 'communication_pattern_analysis' in summary_data:
+        communication = summary_data['communication_pattern_analysis']
+        html_sections.append(f"""
+        <div class="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-cyan-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">沟通模式分析</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">语音活动频率</p>
+                        <p class="text-white font-medium">{communication.get('voice_activity_frequency', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">沟通情绪特征</p>
+                        <p class="text-white font-medium">{communication.get('communication_emotion_features', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-yellow-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">表达方式特点</p>
+                        <p class="text-white font-medium">{communication.get('expression_style_characteristics', '未知')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """)
     
-    return text_content
+    # Comprehensive Status Assessment
+    if 'comprehensive_status_assessment' in summary_data:
+        status = summary_data['comprehensive_status_assessment']
+        html_sections.append(f"""
+        <div class="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">综合状态评估</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">当前整体状态</p>
+                        <p class="text-white font-medium">{status.get('current_overall_status', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">压力水平评估</p>
+                        <p class="text-white font-medium">{status.get('stress_level_assessment', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-yellow-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">效率状态评估</p>
+                        <p class="text-white font-medium">{status.get('efficiency_status_assessment', '未知')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """)
+    
+    # Suggestions and Reminders
+    if 'suggestions_and_reminders' in summary_data:
+        suggestions = summary_data['suggestions_and_reminders']
+        html_sections.append(f"""
+        <div class="mb-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 112 0v1a1 1 0 11-2 0zM12 14a1 1 0 00-.707.293l-.707.707a1 1 0 101.414 1.414l.707-.707A1 1 0 0012 14zM5.757 14.243a1 1 0 00-1.414 0l-.707.707a1 1 0 101.414 1.414l.707-.707a1 1 0 000-1.414z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">建议和提醒</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">健康建议</p>
+                        <p class="text-white font-medium">{suggestions.get('health_suggestions', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">工作效率建议</p>
+                        <p class="text-white font-medium">{suggestions.get('work_efficiency_suggestions', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-yellow-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">情绪管理建议</p>
+                        <p class="text-white font-medium">{suggestions.get('emotion_management_suggestions', '未知')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """)
+    
+    # Diet Health Specific Suggestions (if available)
+    if 'diet_health_specific_suggestions' in summary_data:
+        diet = summary_data['diet_health_specific_suggestions']
+        html_sections.append(f"""
+        <div class="mb-6 p-4 bg-green-900 rounded-lg border border-green-700">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12zm0-10a1 1 0 00-1 1v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6a1 1 0 00-1-1z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">饮食健康专项建议</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">进食时间规律性建议</p>
+                        <p class="text-white font-medium">{diet.get('eating_time_regularity_suggestions', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">营养搭配建议</p>
+                        <p class="text-white font-medium">{diet.get('nutrition_matching_suggestions', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">健康饮食习惯建议</p>
+                        <p class="text-white font-medium">{diet.get('healthy_eating_habit_suggestions', '未知')}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <span class="text-green-400 mr-2">•</span>
+                    <div>
+                        <p class="text-sm text-gray-300">消化健康提醒</p>
+                        <p class="text-white font-medium">{diet.get('digestive_health_reminders', '未知')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """)
+    
+    # Metadata
+    if 'metadata' in summary_data:
+        metadata = summary_data['metadata']
+        data_source_color = 'text-green-400' if not metadata.get('is_mock', False) else 'text-yellow-400'
+        data_source_text = 'AI 分析' if not metadata.get('is_mock', False) else '模拟数据'
+        
+        html_sections.append(f"""
+        <div class="p-4 bg-gray-900 rounded-lg border border-gray-700">
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 mr-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                </svg>
+                <h4 class="text-lg font-semibold text-white">数据统计</h4>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-blue-400">{metadata.get('total_analyses', 0)}</p>
+                    <p class="text-sm text-gray-400">总分析次数</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-green-400">{metadata.get('video_analyses_count', 0)}</p>
+                    <p class="text-sm text-gray-400">视频分析次数</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-cyan-400">{metadata.get('audio_analyses_count', 0)}</p>
+                    <p class="text-sm text-gray-400">音频分析次数</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-purple-400">{'是' if metadata.get('has_eating_activity', False) else '否'}</p>
+                    <p class="text-sm text-gray-400">检测到进食活动</p>
+                </div>
+            </div>
+            {f'<div class="mt-4 text-center"><p class="text-lg font-medium text-green-400">进食活动次数: {metadata.get("eating_activities_count", 0)}</p></div>' if metadata.get('has_eating_activity', False) else ''}
+            <div class="mt-4 text-center">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-300">
+                    <svg class="w-4 h-4 mr-2 {data_source_color}" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z"/>
+                    </svg>
+                    数据来源: {data_source_text}
+                </span>
+            </div>
+        </div>
+        """)
+    
+    # Close main container
+    html_sections.append("</div>")
+    
+    return ''.join(html_sections)
 
 async def analyze_audio_with_gemini(audio_path):
     """Analyze audio using Gemini model"""
@@ -1732,11 +2036,6 @@ def start_background_timers():
     status_thread = threading.Thread(target=overall_status_timer, daemon=True)
     status_thread.start()
     log_info('[STREAM] Started overall status timer (20s)')
-
-    # Comprehensive summary timer (5 minutes)
-    summary_thread = threading.Thread(target=comprehensive_summary_timer, daemon=True)
-    summary_thread.start()
-    log_info('[SUMMARY] Started comprehensive summary timer (5m)')
 
 
 if __name__ == '__main__':
