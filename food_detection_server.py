@@ -1101,7 +1101,7 @@ async def analyze_video_with_gemini(video_path):
     "overall_mental_state": "整体心理状态",
     "attention_level": "注意力集中程度（高/中/低）",
     "emotion_cause": "可能的情绪原因",
-    "eating_drinking": "是否在进食或饮用饮料（是/否）, 如果是，请描述具体的食物或饮料及能量和是否健康"
+    "eating_drinking": "是否在进食或饮用饮料（是/否）, 如果是，请描述具体的食物或饮料及能量和是否健康, 包括摄入食物类型、摄入时间、健康提示"
 }
 
 请确保返回的是有效的JSON格式，不要包含任何其他文本或说明。"""
@@ -1356,8 +1356,11 @@ async def generate_comprehensive_summary():
 ## 进食活动检测：
 {f"检测到 {len(eating_activities)} 次进食相关活动" if has_eating_activity else "未检测到进食活动"}
 
+基于用户的状态总结，给用户一些建议和提醒，如安慰的话、适当放松的动作、或出去走走。
+
 请返回以下JSON结构：
 {{
+    "user_tips": "建议或提醒，根据用户的状态和活动情况，提供一些安慰的话、适当放松的动作、或出去走走。",
     "emotion_trend_analysis": {{
         "main_emotion_pattern": "主要情绪模式",
         "emotion_change_trend": "情绪变化趋势",
@@ -1529,6 +1532,19 @@ def generate_summary_html(summary_data):
     
     # Generate HTML from JSON data
     html_sections = []
+
+    # user tips
+    user_tips = summary_data.get('user_tips', "无")
+    html_sections.append(f"""
+        <div class="bg-yellow-100 text-yellow-800 p-4 rounded-lg border border-yellow-300 mb-4">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+                <p class="text-sm font-medium">{user_tips}</p>
+            </div>
+        </div>
+    """)
     
     # Header
     html_sections.append(f"""
