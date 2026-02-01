@@ -11,12 +11,19 @@ export class MosaicEffectController {
         this.canvas = null;
         this.ctx = null;
         this.isProcessing = false;
-        this.pixelSize = 10; // Default pixelation size
+        this.pixelSize = 20; // Default pixelation size (increased for better visibility)
         this.isEnabled = false;
         this.animationFrameId = null;
         this.rotationAngle = 0;
         this.isMirrored = false;
         this.isRedFilled = false;
+        
+        // New properties for blend mode and opacity control
+        this.blendMode = 'source-over';
+        this.opacity = 0.35;
+        this.canvasOpacity = 0.5;
+        this.changeFrequency = 10;
+        this.frameCount = 0;
     }
 
     /**
@@ -58,10 +65,18 @@ export class MosaicEffectController {
         const pixelSizeSlider = document.getElementById('pixel-size-slider');
         if (pixelSizeSlider) {
             pixelSizeSlider.addEventListener('input', (e) => {
-                this.pixelSize = parseInt(e.target.value);
+                const newSize = parseInt(e.target.value);
+                this.pixelSize = newSize;
                 const pixelSizeValue = document.getElementById('pixel-size-value');
                 if (pixelSizeValue) {
                     pixelSizeValue.textContent = `${this.pixelSize}px`;
+                }
+                console.log('Pixel size changed to:', this.pixelSize);
+                
+                // Force re-render if mosaic is currently enabled
+                if (this.isEnabled && this.isProcessing) {
+                    console.log('Forcing mosaic re-render with new pixel size');
+                    // The next animation frame will use the new pixel size
                 }
             });
         }
@@ -87,6 +102,59 @@ export class MosaicEffectController {
         if (saveCanvasBtn) {
             saveCanvasBtn.addEventListener('click', () => {
                 this.saveCanvasAsJPEG();
+            });
+        }
+        
+        // Mosaic blend mode selector
+        const blendModeSelect = document.getElementById('mosaic-blend-mode');
+        if (blendModeSelect) {
+            blendModeSelect.addEventListener('change', (e) => {
+                this.blendMode = e.target.value;
+                console.log('Mosaic blend mode changed to:', this.blendMode);
+            });
+        }
+        
+        // Mosaic opacity slider
+        const opacitySlider = document.getElementById('mosaic-opacity');
+        if (opacitySlider) {
+            opacitySlider.addEventListener('input', (e) => {
+                this.opacity = parseInt(e.target.value) / 100;
+                const opacityValue = document.getElementById('mosaic-opacity-value');
+                if (opacityValue) {
+                    opacityValue.textContent = `${e.target.value}%`;
+                }
+                console.log('Mosaic opacity changed to:', this.opacity);
+            });
+        }
+        
+        // Mosaic canvas opacity slider
+        const canvasOpacitySlider = document.getElementById('mosaic-canvas-opacity');
+        if (canvasOpacitySlider) {
+            canvasOpacitySlider.addEventListener('input', (e) => {
+                this.canvasOpacity = parseInt(e.target.value) / 100;
+                const canvasOpacityValue = document.getElementById('mosaic-canvas-opacity-value');
+                if (canvasOpacityValue) {
+                    canvasOpacityValue.textContent = `${e.target.value}%`;
+                }
+                console.log('Mosaic canvas opacity changed to:', this.canvasOpacity);
+                
+                // Update canvas opacity immediately if mosaic is enabled
+                if (this.isProcessing && this.canvas) {
+                    this.canvas.style.opacity = this.canvasOpacity;
+                }
+            });
+        }
+        
+        // Mosaic change frequency slider
+        const frequencySlider = document.getElementById('mosaic-change-frequency');
+        if (frequencySlider) {
+            frequencySlider.addEventListener('input', (e) => {
+                this.changeFrequency = parseInt(e.target.value);
+                const frequencyValue = document.getElementById('mosaic-change-frequency-value');
+                if (frequencyValue) {
+                    frequencyValue.textContent = `${e.target.value} frames`;
+                }
+                console.log('Mosaic change frequency changed to:', this.changeFrequency);
             });
         }
     }
@@ -231,17 +299,19 @@ export class MosaicEffectController {
         
         this.isProcessing = true;
         
-        // Show canvas by making it opaque and hide video
+        // Show canvas as overlay, but keep video visible
         if (this.canvas) {
-            this.canvas.style.opacity = '1';
+            this.canvas.style.opacity = this.canvasOpacity; // Use canvas-specific opacity
+            this.canvas.style.zIndex = '10'; // Ensure it's above video
+        }
+        
+        // Keep video visible (main-video shows camera content)
+        if (this.videoElement) {
+            this.videoElement.style.opacity = '1';
         }
         
         // Update canvas dimensions to match current video display size
         this.updateCanvasPosition();
-        
-        if (this.videoElement) {
-            this.videoElement.style.opacity = '0';
-        }
         
         // Wait for video to be loaded before starting processing
         const waitForVideo = () => {
@@ -279,7 +349,7 @@ export class MosaicEffectController {
             this.resizeObserver = null;
         }
         
-        // Make canvas transparent to show video again
+        // Hide canvas overlay, keep video visible
         if (this.canvas) {
             this.canvas.style.opacity = '0';
         }
@@ -287,7 +357,7 @@ export class MosaicEffectController {
             this.videoElement.style.opacity = '1';
         }
         
-        // Cancel animation frame
+        // Cancel the animation frame
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
@@ -323,57 +393,7 @@ export class MosaicEffectController {
             return;
         }
         
-        // Calculate the aspect ratio to properly draw the video content
-        // The video element uses object-contain which maintains aspect ratio
-        const videoNaturalAspectRatio = this.videoElement.videoWidth / this.videoElement.videoHeight;
-        const canvasAspectRatio = this.canvas.width / this.canvas.height;
-        
-        let drawWidth, drawHeight, offsetX, offsetY;
-        
-        // Determine how the video would be scaled in the canvas to maintain aspect ratio
-        if (canvasAspectRatio > videoNaturalAspectRatio) {
-            // Canvas is wider relative to video's aspect ratio - letterbox effect
-            drawHeight = this.canvas.height;
-            drawWidth = drawHeight * videoNaturalAspectRatio;
-            offsetX = (this.canvas.width - drawWidth) / 2;
-            offsetY = 0;
-        } else {
-            // Canvas is taller relative to video's aspect ratio - pillarbox effect
-            drawWidth = this.canvas.width;
-            drawHeight = drawWidth / videoNaturalAspectRatio;
-            offsetX = 0;
-            offsetY = (this.canvas.height - drawHeight) / 2;
-        }
-        
-        // Save the current context state
-        this.ctx.save();
-        
-        // Apply transformations (mirror and rotation)
-        // First translate to the center of where the video should be drawn
-        this.ctx.translate(offsetX + drawWidth / 2, offsetY + drawHeight / 2);
-        
-        // Apply mirror (scaleX(-1))
-        if (this.isMirrored) {
-            this.ctx.scale(-1, 1);
-        }
-        
-        // Apply rotation
-        this.ctx.rotate(this.rotationAngle * Math.PI / 180); // Convert degrees to radians
-        
-        // Draw the video frame to canvas with correct aspect ratio
-        // Draw at (-drawWidth/2, -drawHeight/2) relative to the translated center
-        this.ctx.drawImage(
-            this.videoElement,
-            -drawWidth / 2,
-            -drawHeight / 2,
-            drawWidth,
-            drawHeight
-        );
-        
-        // Restore the context state
-        this.ctx.restore();
-        
-        // Apply mosaic effect to the transformed image
+        // Apply mosaic effect (video content is shown in main-video element)
         this.applyMosaicEffect();
         
         // Continue processing
@@ -386,52 +406,86 @@ export class MosaicEffectController {
     applyMosaicEffect() {
         if (!this.ctx || !this.canvas) return;
         
+        // Debug: Log current pixel size
+        console.log('Applying mosaic with pixel size:', this.pixelSize);
+        
+        // Clear canvas first (don't draw video content here)
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Save the current context state
+        this.ctx.save();
+        
+        // Increment frame count
+        this.frameCount++;
+        
+        // Only change mosaic pattern based on frequency
+        if (this.frameCount % this.changeFrequency === 0) {
+            // Create new random pattern
+            this.mosaicPattern = this.generateMosaicPattern();
+        }
+        
+        // Use the stored pattern or generate if not exists
+        if (!this.mosaicPattern) {
+            this.mosaicPattern = this.generateMosaicPattern();
+        }
+        
+        // Apply the pattern
+        this.applyMosaicPattern();
+        
+        // Restore the context state
+        this.ctx.restore();
+        
+        // Set canvas transparency for overlay effect
+        this.canvas.style.opacity = this.canvasOpacity;
+    }
+    
+    /**
+     * Generate a new mosaic pattern with random transparency
+     */
+    generateMosaicPattern() {
         const width = this.canvas.width;
         const height = this.canvas.height;
+        const pattern = [];
         
-        // Get image data
-        const imageData = this.ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
-        
-        // Apply pixelation
+        // Create independent black/gray squares with different transparency
+        // Adjusted range: 40% to 80% (less transparent blocks)
         for (let y = 0; y < height; y += this.pixelSize) {
             for (let x = 0; x < width; x += this.pixelSize) {
-                // Calculate the average color for this pixel block
-                let r = 0, g = 0, b = 0, a = 0;
-                let count = 0;
+                // Random transparency for each block (40% to 80% - less transparent)
+                const blockOpacity = 0.7 + Math.random() * 0.3;
                 
-                for (let dy = 0; dy < this.pixelSize && y + dy < height; dy++) {
-                    for (let dx = 0; dx < this.pixelSize && x + dx < width; dx++) {
-                        const index = ((y + dy) * width + (x + dx)) * 4;
-                        r += data[index];
-                        g += data[index + 1];
-                        b += data[index + 2];
-                        a += data[index + 3];
-                        count++;
-                    }
-                }
-                
-                // Calculate average
-                r = Math.floor(r / count);
-                g = Math.floor(g / count);
-                b = Math.floor(b / count);
-                a = Math.floor(a / count);
-                
-                // Apply average color to all pixels in this block
-                for (let dy = 0; dy < this.pixelSize && y + dy < height; dy++) {
-                    for (let dx = 0; dx < this.pixelSize && x + dx < width; dx++) {
-                        const index = ((y + dy) * width + (x + dx)) * 4;
-                        data[index] = r;
-                        data[index + 1] = g;
-                        data[index + 2] = b;
-                        data[index + 3] = a;
-                    }
-                }
+                pattern.push({
+                    x: x,
+                    y: y,
+                    opacity: blockOpacity
+                });
             }
         }
         
-        // Put the modified image data back
-        this.ctx.putImageData(imageData, 0, 0);
+        return pattern;
+    }
+    
+    /**
+     * Apply the stored mosaic pattern to the canvas
+     */
+    applyMosaicPattern() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        
+        // Draw rectangles with stored transparency
+        for (const block of this.mosaicPattern) {
+            this.ctx.globalAlpha = block.opacity;
+            
+            // Use different colors based on blend mode
+            if (this.blendMode === 'black-pixels') {
+                this.ctx.fillStyle = '#000000'; // Black color
+            } else {
+                this.ctx.fillStyle = '#808080'; // Gray color
+            }
+            
+            // Draw a semi-transparent rectangle
+            this.ctx.fillRect(block.x, block.y, this.pixelSize, this.pixelSize);
+        }
     }
 
     /**
