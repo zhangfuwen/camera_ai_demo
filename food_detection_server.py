@@ -714,42 +714,180 @@ def generate_sensor_data():
     }
 
 def generate_sensor_html():
-    """Generate plain text for sensor values"""
+    """Generate HTML for sensor values with proper formatting using loop"""
     data = generate_sensor_data()
-    return f"""能量值: {data['energy']}
-睡眠时长: {data['sleep']} 小时
-运动步数: {data['sport']} 步
-血压: {data['blood']}
-心率: {data['heartRate']} 次/分
-卡路里: {data['calories']} 卡"""
+    
+    # Define sensor items with their labels and icons
+    sensor_items = [
+        {
+            'label': '能量值',
+            'value': data['energy'],
+            'icon': 'M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z'
+        },
+        {
+            'label': '睡眠时长',
+            'value': f"{data['sleep']} 小时",
+            'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+        },
+        {
+            'label': '运动步数',
+            'value': f"{data['sport']} 步",
+            'icon': 'M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z'
+        },
+        {
+            'label': '血压',
+            'value': data['blood'],
+            'icon': 'M9 2a1 1 0 000 2h2a1 1 0 100-2H9z M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z'
+        },
+        {
+            'label': '心率',
+            'value': f"{data['heartRate']} 次/分",
+            'icon': 'M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z'
+        },
+        {
+            'label': '卡路里',
+            'value': f"{data['calories']} 卡",
+            'icon': 'M9 2a1 1 0 000 2h2a1 1 0 100-2H9z M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z'
+        }
+    ]
+    
+    # Generate HTML using loop
+    html_parts = []
+    for item in sensor_items:
+        html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="{item['icon']}"/>
+                                    </svg>
+                                    <span>{item['label']} {item['value']}</span>
+                                </div>""")
+    
+    return ''.join(html_parts)
 
 def generate_emotion_html():
-    """Generate plain text for user emotions from stored analysis results"""
+    """Generate HTML for user emotions from stored analysis results using loop"""
     if analysis_results['emotion_history']:
         # Get the most recent emotion analysis
         latest_emotion = analysis_results['emotion_history'][-1]
-        return f"""情绪状态: {latest_emotion['emotion']}
-强度: {latest_emotion['intensity']}
-检测时间: {datetime.fromisoformat(latest_emotion['timestamp']).strftime('%H:%M:%S')}"""
+        
+        # Define emotion items with their labels and icons
+        emotion_items = [
+            {
+                'label': '情绪状态',
+                'value': latest_emotion['emotion'],
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '强度',
+                'value': latest_emotion['intensity'],
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '检测时间',
+                'value': datetime.fromisoformat(latest_emotion['timestamp']).strftime('%H:%M:%S'),
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+            }
+        ]
+        
+        # Generate HTML using loop
+        html_parts = []
+        for item in emotion_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        return ''.join(html_parts)
     else:
         log_debug("[EMOTION] No emotion analysis results available")
-        # Fallback if no analysis results available
-        return "情绪状态: 等待分析数据..."
+        # Return default emotion HTML when no data available
+        default_items = [
+            {
+                'label': '情绪状态',
+                'value': '等待分析数据',
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            }
+        ]
+        
+        html_parts = []
+        for item in default_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        return ''.join(html_parts)
 
 def generate_audio_detection_html():
-    """Generate plain text for audio detection results from stored analysis results"""
+    """Generate HTML for audio detection results from stored analysis results using loop"""
     if analysis_results['audio_analysis']:
         # Get the most recent audio analysis
         latest_audio = analysis_results['audio_analysis'][-1]
-        return f"""语音内容: {latest_audio['speech_content']}
-情绪状态: {latest_audio['emotion_state']}
-音量: {latest_audio['volume_level']}
-音质: {latest_audio['voice_quality']}
-分析时间: {datetime.fromisoformat(latest_audio['timestamp']).strftime('%H:%M:%S')}"""
+        
+        # Define audio items with their labels and icons
+        audio_items = [
+            {
+                'label': '语音内容',
+                'value': latest_audio['speech_content'],
+                'icon': 'M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z'
+            },
+            {
+                'label': '情绪状态',
+                'value': latest_audio['emotion_state'],
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '音量',
+                'value': latest_audio['volume_level'],
+                'icon': 'M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z'
+            },
+            {
+                'label': '音质',
+                'value': latest_audio['voice_quality'],
+                'icon': 'M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z'
+            },
+            {
+                'label': '分析时间',
+                'value': datetime.fromisoformat(latest_audio['timestamp']).strftime('%H:%M:%S'),
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+            }
+        ]
+        
+        # Generate HTML using loop
+        html_parts = []
+        for item in audio_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        return ''.join(html_parts)
     else:
         log_debug("[AUDIO] No audio analysis results available")
-        # Fallback if no analysis results available
-        return "音频分析: 等待分析数据..."
+        # Return default audio HTML when no data available
+        default_items = [
+            {
+                'label': '音频分析',
+                'value': '等待分析数据',
+                'icon': 'M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z'
+            }
+        ]
+        
+        html_parts = []
+        for item in default_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        return ''.join(html_parts)
 
 def generate_video_detection_html():
     """Generate plain text for video detection results from stored analysis results"""
@@ -996,13 +1134,74 @@ async def analyze_video_with_gemini(video_path):
             activity_level = "未知"
             overall_state = "解析错误"
         
-        # Generate comprehensive video detection text
-        video_text = f"活动强度: {activity_level}\n心理状态: {overall_state}\n情绪强度: {emotion_intensity}\n分析时间: {datetime.now().strftime('%H:%M:%S')}"
-        broadcast_to_clients('video_detect', video_text)
+        # Generate comprehensive video detection HTML using loop format
+        video_items = [
+            {
+                'label': '活动强度',
+                'value': activity_level,
+                'icon': 'M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z'
+            },
+            {
+                'label': '心理状态',
+                'value': overall_state,
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '情绪强度',
+                'value': emotion_intensity,
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '分析时间',
+                'value': datetime.now().strftime('%H:%M:%S'),
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+            }
+        ]
         
-        # Generate detailed emotion text
-        emotion_text = f"主要情绪: {emotion_state}\n检测时间: {datetime.now().strftime('%H:%M:%S')}\n分析模型: Gemini-3-Pro"
-        broadcast_to_clients('emotion_update', emotion_text)
+        # Generate HTML using loop
+        html_parts = []
+        for item in video_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        video_html = ''.join(html_parts)
+        broadcast_to_clients('video_detect', video_html)
+        
+        # Generate detailed emotion HTML using loop format
+        emotion_items = [
+            {
+                'label': '主要情绪',
+                'value': emotion_state,
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '检测时间',
+                'value': datetime.now().strftime('%H:%M:%S'),
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+            },
+            {
+                'label': '分析模型',
+                'value': 'Gemini-3-Pro',
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            }
+        ]
+        
+        # Generate HTML using loop
+        html_parts = []
+        for item in emotion_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        emotion_html = ''.join(html_parts)
+        broadcast_to_clients('emotion_update', emotion_html)
         
         # Store analysis results for summary generation
         video_result = {
@@ -1045,14 +1244,6 @@ async def analyze_video_with_gemini(video_path):
             analysis_results['activity_history'].pop(0)
         
         print(f'[STORAGE] Stored video analysis results. Total stored: {len(analysis_results["video_analysis"])}')
-        
-        # Clean up uploaded file
-        try:
-            gemini_client.files.delete(uploaded_file.name)
-            print(f'[GEMINI] Cleaned up video file: {uploaded_file.name}')
-        except:
-            pass
-        
         print(f'[GEMINI] Video analysis completed for: {video_path}')
         
     except Exception as e:
@@ -1392,9 +1583,47 @@ async def analyze_audio_with_gemini(audio_path):
             volume_level = "未知"
             voice_quality = "解析错误"
         
-        # Generate comprehensive audio detection text
-        audio_text = f"语音内容: {speech_content}\n情绪状态: {emotion_state}\n音量: {volume_level}\n音质: {voice_quality}\n分析时间: {datetime.now().strftime('%H:%M:%S')}"
-        broadcast_to_clients('audio_detect', audio_text)
+        # Generate comprehensive audio detection HTML using loop format
+        audio_items = [
+            {
+                'label': '语音内容',
+                'value': speech_content,
+                'icon': 'M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z'
+            },
+            {
+                'label': '情绪状态',
+                'value': emotion_state,
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            },
+            {
+                'label': '音量',
+                'value': volume_level,
+                'icon': 'M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z'
+            },
+            {
+                'label': '音质',
+                'value': voice_quality,
+                'icon': 'M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z'
+            },
+            {
+                'label': '分析时间',
+                'value': datetime.now().strftime('%H:%M:%S'),
+                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+            }
+        ]
+        
+        # Generate HTML using loop
+        html_parts = []
+        for item in audio_items:
+            html_parts.append(f"""<div class="flex items-center text-white text-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="{item['icon']}"/>
+                                        </svg>
+                                        <span>{item['label']} {item['value']}</span>
+                                    </div>""")
+        
+        audio_html = ''.join(html_parts)
+        broadcast_to_clients('audio_detect', audio_html)
         
         # Store analysis results for summary generation
         audio_result = {

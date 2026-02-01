@@ -439,48 +439,51 @@
                 <img id="main-image" class="w-full h-full object-contain bg-gray-800 hidden" alt="Uploaded image">
                 <canvas id="detection-overlay" class="absolute top-0 left-0 pointer-events-none z-10"></canvas>
                 
-                <!-- Health Data Overlay -->
                 <div class="absolute top-4 left-4 p-3 rounded-lg z-20" style="background-color: rgba(26, 26, 26, 0.8); padding: 12px; max-width: 300px;">
                     <!-- 生理信息 Section -->
                     <div class="mb-4">
                         <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">生理信息</h3>
                         <div class="space-y-2">
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/>
-                                </svg>
-                                <span>心率信息 10.36 次/分</span>
-                            </div>
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-                                </svg>
-                                <span>血氧 98.2 %</span>
-                            </div>
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
-                                </svg>
-                                <span>速度 107 mph</span>
+                            <div id="bio-info-container">
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/>
+                                    </svg>
+                                    <span>心率信息 10.36 次/分</span>
+                                </div>
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>血氧 98.2 %</span>
+                                </div>
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                                    </svg>
+                                    <span>速度 107 mph</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- 语音信息 Section -->
-                    <div class="mb-4">
+                    <div class="mb-4" >
                         <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">语音信息</h3>
                         <div class="space-y-2">
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
-                                </svg>
-                                <span id="voice-info-1">语音信息 真儿</span>
-                            </div>
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
-                                </svg>
-                                <span id="voice-info-2">语音信息 聊聊天的音声</span>
+                            <div id="voice-info-container">
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span id="voice-info-1">语音信息 真儿</span>
+                                </div>
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span id="voice-info-2">语音信息 聊聊天的音声</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -489,38 +492,43 @@
                     <div class="mb-4">
                         <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">表情识别</h3>
                         <div class="space-y-2">
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd"/>
-                                </svg>
-                                <span>表情识别 微笑</span>
-                            </div>
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd"/>
-                                </svg>
-                                <span>表情识别 不酷</span>
+                            <div id="emotion-info-container">
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>表情识别 微笑</span>
+                                </div>
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>表情识别 不酷</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- 食物摄入识别 Section -->
-                    <div>
+                    <div class="mb-4">
                         <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">食物摄入识别</h3>
                         <div class="space-y-2">
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
-                                </svg>
-                                <span>食物摄入识别 低</span>
-                            </div>
-                            <div class="flex items-center text-white text-sm">
-                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
-                                </svg>
-                                <span>食物摄入识别 2</span>
+                            <div id="food-info-container">
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>食物摄入识别 低</span>
+                                </div>
+                                <div class="flex items-center text-white text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>食物摄入识别 2</span>
+                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -546,7 +554,7 @@
             <h2 class="text-white font-bold text-lg mb-4" style="margin-top: 16px;">今日摄入与建议</h2>
             
             <!-- Food Icons Section -->
-            <div class="mb-6">
+            <div id="overall-info-container" class="mb-6">
                 <div class="flex items-center justify-center space-x-3" style="spacing: 12px;">
                     <div class="flex flex-col items-center">
                         <svg class="w-12 h-12 mb-2" fill="currentColor" viewBox="0 0 24 24" style="color: #FF6B35;">

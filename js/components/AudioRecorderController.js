@@ -2,6 +2,8 @@
  * Audio Recorder Controller
  * Handles recording audio every 10 seconds and uploading to server
  */
+import { Logger } from '../utils/logger.js';
+
 export class AudioRecorderController {
     constructor() {
         this.mediaRecorder = null;
@@ -16,13 +18,14 @@ export class AudioRecorderController {
         this.audioStream = null;
         this.audioDevices = [];
         this.selectedAudioDeviceId = null;
+        this.logger = new Logger('AudioRecorderController', 'INFO');
     }
 
     /**
      * Initialize the audio recorder controller
      */
     initialize() {
-        console.log('Initializing Audio Recorder Controller...');
+        this.logger.info('Initializing Audio Recorder Controller...');
         this.setupEventListeners();
         this.updateUI();
         this.getAudioDevices();
@@ -46,7 +49,7 @@ export class AudioRecorderController {
         if (audioSourceSelect) {
             audioSourceSelect.addEventListener('change', (e) => {
                 this.selectedAudioDeviceId = e.target.value;
-                console.log('Selected audio device:', this.selectedAudioDeviceId);
+                this.logger.debug(`Selected audio device: ${this.selectedAudioDeviceId}`);
             });
         }
 
@@ -64,19 +67,19 @@ export class AudioRecorderController {
      */
     async getAudioDevices() {
         try {
-            console.log('Getting audio devices...');
+            this.logger.debug('Getting audio devices...');
             const devices = await navigator.mediaDevices.enumerateDevices();
             
             // Filter audio input devices
             this.audioDevices = devices.filter(device => device.kind === 'audioinput');
             
-            console.log('Found audio devices:', this.audioDevices);
+            this.logger.debug(`Found ${this.audioDevices.length} audio devices`);
             
             // Update UI with device list
             this.updateAudioDeviceList();
             
         } catch (error) {
-            console.error('Error getting audio devices:', error);
+            this.logger.error(`Error getting audio devices: ${error.message}`);
             this.addUploadLog('Error getting audio devices: ' + error.message, 'error');
         }
     }
@@ -145,7 +148,7 @@ export class AudioRecorderController {
             }
             
             // Request microphone access with specific device
-            console.log('Requesting microphone access for device:', this.selectedAudioDeviceId);
+            this.logger.debug(`Requesting microphone access for device: ${this.selectedAudioDeviceId}`);
             
             const constraints = {
                 audio: {
@@ -159,7 +162,7 @@ export class AudioRecorderController {
             
             this.audioStream = await navigator.mediaDevices.getUserMedia(constraints);
             
-            console.log('Microphone access granted');
+            this.logger.info('Microphone access granted');
             
             // Create MediaRecorder instance
             this.mediaRecorder = new MediaRecorder(this.audioStream, {
@@ -183,21 +186,18 @@ export class AudioRecorderController {
             this.recordingStartTime = Date.now();
             this.isRecording = true;
 
-            console.log('Audio recording started');
+            this.logger.info('Audio recording started');
             this.updateUI();
             this.updateStatus('Audio recording: Active');
             this.addUploadLog('Audio recording started', 'success');
             
-            // Update voice information in health overlay
-            this.updateVoiceInfo('正在录音...', '音频处理中...');
-
             // Set up interval to process recordings every 10 seconds
             this.recordingInterval = setInterval(() => {
                 this.processCurrentRecording();
             }, this.recordingDuration);
 
         } catch (error) {
-            console.error('Error starting audio recording:', error);
+            this.logger.error(`Error starting audio recording: ${error.message}`);
             this.updateStatus('Error starting audio recording: ' + error.message);
             this.addUploadLog(`❌ Error starting recording: ${error.message}`, 'error');
         }
@@ -207,7 +207,7 @@ export class AudioRecorderController {
      * Stop audio recording
      */
     stopRecording() {
-        console.log('Stopping audio recording...');
+        this.logger.info('Stopping audio recording...');
         
         // Clear the recording interval first
         if (this.recordingInterval) {
@@ -217,26 +217,24 @@ export class AudioRecorderController {
 
         // Stop the MediaRecorder
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            console.log('Stopping Audio MediaRecorder...');
+            this.logger.debug('Stopping Audio MediaRecorder...');
             this.mediaRecorder.stop();
         }
 
         // Stop the audio stream
         if (this.audioStream) {
-            console.log('Stopping audio stream...');
+            this.logger.debug('Stopping audio stream...');
             this.audioStream.getTracks().forEach(track => track.stop());
             this.audioStream = null;
         }
 
         this.isRecording = false;
-        console.log('Audio recording stopped');
+        this.logger.info('Audio recording stopped');
         
         this.updateUI();
         this.updateStatus('Audio recording: Stopped');
         this.addUploadLog('Audio recording stopped', 'info');
         
-        // Update voice information in health overlay
-        this.updateVoiceInfo('录音已停止', '音频处理完成');
     }
 
     /**
@@ -248,8 +246,7 @@ export class AudioRecorderController {
             
             // Update voice information to show processing
             const timestamp = new Date().toLocaleTimeString();
-            this.updateVoiceInfo('正在处理音频...', `处理时间: ${timestamp}`);
-            
+
             // Stop current MediaRecorder
             this.mediaRecorder.stop();
             
@@ -258,7 +255,6 @@ export class AudioRecorderController {
                 if (this.isRecording) {
                     this.startNewRecordingChunk();
                     // Update voice info to show new recording started
-                    this.updateVoiceInfo('继续录音...', '音频采集中...');
                 }
             }, 100); // Small delay to ensure clean transition
         }
@@ -564,21 +560,4 @@ export class AudioRecorderController {
         };
     }
 
-    /**
-     * Update voice information in health overlay
-     */
-    updateVoiceInfo(info1, info2) {
-        const voiceInfo1 = document.getElementById('voice-info-1');
-        const voiceInfo2 = document.getElementById('voice-info-2');
-        
-        if (voiceInfo1) {
-            voiceInfo1.textContent = `语音信息 ${info1}`;
-        }
-        
-        if (voiceInfo2) {
-            voiceInfo2.textContent = `语音信息 ${info2}`;
-        }
-        
-        console.log(`Voice info updated: ${info1}, ${info2}`);
-    }
 }

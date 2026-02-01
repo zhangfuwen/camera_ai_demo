@@ -2,6 +2,8 @@
  * Stream Controller
  * Handles SocketIO connection for real-time updates from server
  */
+import { Logger } from '../utils/logger.js';
+
 export class StreamController {
     constructor() {
         this.socket = null;
@@ -10,13 +12,14 @@ export class StreamController {
         this.reconnectInterval = 3000;
         this.isConnected = false;
         this.heartbeatInterval = null;
+        this.logger = new Logger('StreamController', 'INFO');
     }
 
     /**
      * Initialize the stream controller
      */
     initialize() {
-        console.log('Initializing Stream Controller...');
+        this.logger.info('Initializing Stream Controller...');
         this.connect();
     }
 
@@ -25,11 +28,11 @@ export class StreamController {
      */
     connect() {
         try {
-            console.log('Connecting to SocketIO server...');
+            this.logger.info('Connecting to SocketIO server...');
             this.socket = io();
 
             this.socket.on('connect', () => {
-                console.log('SocketIO connected successfully');
+                this.logger.info('SocketIO connected successfully');
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.startHeartbeat();
@@ -37,7 +40,7 @@ export class StreamController {
             });
 
             this.socket.on('disconnect', (reason) => {
-                console.log('SocketIO disconnected:', reason);
+                this.logger.warning(`SocketIO disconnected: ${reason}`);
                 this.isConnected = false;
                 this.stopHeartbeat();
                 this.updateConnectionStatus('Disconnected');
@@ -45,7 +48,7 @@ export class StreamController {
             });
 
             this.socket.on('connect_error', (error) => {
-                console.error('SocketIO connection error:', error);
+                this.logger.error(`SocketIO connection error: ${error.message}`);
                 this.updateConnectionStatus('Error');
                 this.handleReconnect();
             });
@@ -55,16 +58,16 @@ export class StreamController {
             });
 
             this.socket.on('status', (data) => {
-                console.log('Status message:', data);
+                this.logger.debug('Status message received:', data);
             });
 
             this.socket.on('heartbeat_response', (data) => {
                 // Handle heartbeat response
-                console.log('Heartbeat response:', data);
+                this.logger.verbose('Heartbeat response:', data);
             });
 
         } catch (error) {
-            console.error('Failed to create SocketIO connection:', error);
+            this.logger.error(`Failed to create SocketIO connection: ${error.message}`);
             this.handleReconnect();
         }
     }
@@ -74,32 +77,32 @@ export class StreamController {
      */
     handleMessage(data) {
         try {
-            console.log('Received message:', data);
+            this.logger.debug(`Received ${data.type} message`);
 
             switch (data.type) {
                 case 'sensor_update':
-                    this.updateStatusOverlay('#status-overlay', data.content);
+                    this.updateStatusOverlay('#bio-info-container', data.content);
                     break;
                 case 'emotion_update':
-                    this.updateStatusOverlay('#status-overlay2', data.content);
+                    this.updateStatusOverlay('#emotion-info-container', data.content);
                     break;
                 case 'audio_detect':
-                    this.updateStatusOverlay('#status-overlay3', data.content);
+                    this.updateStatusOverlay('#voice-info-container', data.content);
                     break;
                 case 'video_detect':
-                    this.updateStatusOverlay('#status-overlay4', data.content);
+                    this.updateStatusOverlay('#food-info-container', data.content);
                     break;
                 case 'overall_status':
-                    this.updateStatusOverlay('#status-overlay5', data.content);
+                    this.updateStatusOverlay('#overall-info-container', data.content);
                     break;
                 case 'heartbeat':
                     // Handle heartbeat response
                     break;
                 default:
-                    console.warn('Unknown message type:', data.type);
+                    this.logger.warning(`Unknown message type: ${data.type}`);
             }
         } catch (error) {
-            console.error('Error parsing SocketIO message:', error);
+            this.logger.error(`Error parsing SocketIO message: ${error.message}`);
         }
     }
 
@@ -113,43 +116,45 @@ export class StreamController {
             const flipAnimationEnabled = document.getElementById('flip-animation-toggle')?.checked ?? true;
             const animationStyle = document.getElementById('animation-style-select')?.value ?? 'card-flip';
             
-            if (flipAnimationEnabled) {
-                // Add animation class based on selected style
-                element.classList.add(animationStyle);
-                
-                // Update content after a short delay to sync with animation
-                const delay = animationStyle === 'pulse' ? 0 : 300;
-                setTimeout(() => {
-                    // Use textContent for plain text and style for better formatting
-                    element.textContent = content;
-                    element.style.whiteSpace = 'pre-line';
-                    element.style.fontFamily = 'monospace';
-                    element.style.fontSize = '11px';
-                    element.style.lineHeight = '1.3';
-                    element.style.color = '#22c55e';
-                    
-                    console.log(`Updated ${selector} with plain text content (${animationStyle} animation)`);
-                }, delay);
-                
-                // Remove animation class after animation completes
-                const animationDuration = animationStyle === 'pulse' ? 400 : 600;
-                setTimeout(() => {
-                    element.classList.remove(animationStyle);
-                }, animationDuration);
-            } else {
+            // if (flipAnimationEnabled) {
+            //     // Add animation class based on selected style
+            //     element.classList.add(animationStyle);
+            //
+            //     // Update content after a short delay to sync with animation
+            //     const delay = animationStyle === 'pulse' ? 0 : 300;
+            //     setTimeout(() => {
+            //         // Use textContent for plain text and style for better formatting
+            //         element.innerHTML = content;
+            //         // element.textContent = content;
+            //         // element.style.whiteSpace = 'pre-line';
+            //         // element.style.fontFamily = 'monospace';
+            //         // element.style.fontSize = '11px';
+            //         // element.style.lineHeight = '1.3';
+            //         // element.style.color = '#22c55e';
+            //
+            //         this.logger.debug(`Updated ${selector} with plain text content (${animationStyle} animation)`);
+            //     }, delay);
+            //
+            //     // Remove animation class after animation completes
+            //     const animationDuration = animationStyle === 'pulse' ? 400 : 600;
+            //     setTimeout(() => {
+            //         element.classList.remove(animationStyle);
+            //     }, animationDuration);
+            // } else {
                 // Update content immediately without animation
-                element.textContent = content;
-                element.style.whiteSpace = 'pre-line';
-                element.style.fontFamily = 'monospace';
-                element.style.fontSize = '11px';
-                element.style.lineHeight = '1.3';
-                element.style.color = '#22c55e';
+                element.innerHTML = content;
+                // element.textContent = content;
+                // element.style.whiteSpace = 'pre-line';
+                // element.style.fontFamily = 'monospace';
+                // element.style.fontSize = '11px';
+                // element.style.lineHeight = '1.3';
+                // element.style.color = '#22c55e';
                 
-                console.log(`Updated ${selector} with plain text content (no animation)`);
-            }
+            //     this.logger.debug(`Updated ${selector} with plain text content (no animation)`);
+            // }
             
         } else {
-            console.warn(`Element not found: ${selector}`);
+            this.logger.warning(`Element not found: ${selector}`);
         }
     }
     
@@ -174,7 +179,7 @@ export class StreamController {
                 element.style.lineHeight = '1.3';
                 element.style.color = '#22c55e';
                 
-                console.log(`Updated ${selector} with plain text content (pulse effect)`);
+                this.logger.debug(`Updated ${selector} with plain text content (pulse effect)`);
                 
                 // Remove animation class after animation completes
                 setTimeout(() => {
@@ -189,11 +194,11 @@ export class StreamController {
                 element.style.lineHeight = '1.3';
                 element.style.color = '#22c55e';
                 
-                console.log(`Updated ${selector} with plain text content (no animation)`);
+                this.logger.debug(`Updated ${selector} with plain text content (no animation)`);
             }
             
         } else {
-            console.warn(`Element not found: ${selector}`);
+            this.logger.warning(`Element not found: ${selector}`);
         }
     }
     
@@ -219,7 +224,7 @@ export class StreamController {
                     element.style.lineHeight = '1.3';
                     element.style.color = '#22c55e';
                     
-                    console.log(`Updated ${selector} with plain text content (flip effect)`);
+                    this.logger.debug(`Updated ${selector} with plain text content (flip effect)`);
                 }, 300); // Halfway through the animation
                 
                 // Remove animation class after animation completes
@@ -235,11 +240,11 @@ export class StreamController {
                 element.style.lineHeight = '1.3';
                 element.style.color = '#22c55e';
                 
-                console.log(`Updated ${selector} with plain text content (no animation)`);
+                this.logger.debug(`Updated ${selector} with plain text content (no animation)`);
             }
             
         } else {
-            console.warn(`Element not found: ${selector}`);
+            this.logger.warning(`Element not found: ${selector}`);
         }
     }
 
@@ -249,13 +254,13 @@ export class StreamController {
     handleReconnect() {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+            this.logger.info(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
             
             setTimeout(() => {
                 this.connect();
             }, this.reconnectInterval);
         } else {
-            console.error('Max reconnection attempts reached');
+            this.logger.error('Max reconnection attempts reached');
             this.updateConnectionStatus('Connection Failed');
         }
     }
