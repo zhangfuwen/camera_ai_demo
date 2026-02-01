@@ -2,6 +2,8 @@
  * Component utilities for creating and managing UI components
  */
 
+import { globalLogger } from '../utils/logger.js';
+
 /**
  * Create a component from a template
  * @param {string} templateId - ID of the template element
@@ -50,6 +52,7 @@ export async function loadPartial(selector, path) {
  * @param {string|Element} element - Element or selector to show
  */
 export function showElement(element) {
+    globalLogger.info('showElement', element);
     const el = typeof element === 'string' ? document.querySelector(element) : element;
     if (el) {
         el.classList.remove('hidden');

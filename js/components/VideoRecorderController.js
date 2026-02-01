@@ -375,7 +375,7 @@ export class VideoRecorderController {
         // Create log container
         const logContainer = document.createElement('div');
         logContainer.id = 'upload-log-container';
-        logContainer.className = 'mt-4 p-3 bg-gray-900 rounded border border-gray-700 max-h-48 overflow-y-auto';
+        logContainer.className = 'mt-4 p-3 bg-gray-900 rounded border border-gray-700 max-h-48 overflow-y-auto hidden';
         
         // Add title
         const title = document.createElement('div');
