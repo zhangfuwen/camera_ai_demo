@@ -411,7 +411,7 @@ export class FoodDetectionController {
             }
             if (label == 'laptop' || label == 'mouse' || label == 'keyboard' || label == 'cell phone'
                 || label == 'dining table' || label == 'chair'
-                || label == 'remote' || label == 'toilet'
+                || label == 'remote' || label == 'toilet' || label == 'cup'
             ) {
                 return;
             }
