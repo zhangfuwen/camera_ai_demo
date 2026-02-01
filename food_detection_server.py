@@ -132,6 +132,9 @@ analysis_results = {
     'activity_history': [] # Store activity tracking data
 }
 
+# Global variable to control periodic summary
+periodic_summary_enabled = False
+
 # Configuration for storage limits
 MAX_STORED_RESULTS = 50  # Keep last 50 results of each type
 
@@ -247,7 +250,7 @@ def detect_food():
         log_debug("Image shape:" + str(img.shape))
         
         # Perform segmentation with YOLO
-        results = model(img, conf=0.5)  # Confidence threshold of 0.5
+        results = model(img, conf=0.8)  # Confidence threshold of 0.5
         
         detections = []
         
@@ -341,7 +344,7 @@ def detect_food_stream():
             return jsonify({"success": False, "error": "Could not decode image"}), 400
         
         # Perform segmentation with YOLO
-        results = model(img, conf=0.5)  # Confidence threshold of 0.5
+        results = model(img, conf=0.8)  # Confidence threshold of 0.8
         
         detections = []
         
@@ -592,6 +595,62 @@ def upload_audio():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'model_loaded': True})
+
+
+@app.route('/api/periodic-summary/start', methods=['POST'])
+def start_periodic_summary():
+    """Start the periodic summary timer"""
+    try:
+        global periodic_summary_enabled
+        periodic_summary_enabled = True
+        
+        # Start the overall status timer if not already running
+        if not hasattr(start_periodic_summary, 'timer_thread') or not start_periodic_summary.timer_thread.is_alive():
+            start_periodic_summary.timer_thread = threading.Thread(target=overall_status_timer, daemon=True)
+            start_periodic_summary.timer_thread.start()
+        
+        log_info('[PERIODIC_SUMMARY] Periodic summary started')
+        
+        # Broadcast status to all clients
+        broadcast_to_clients('periodic_summary_status', {'active': True})
+        
+        return jsonify({'success': True, 'message': 'Periodic summary started'})
+    except Exception as e:
+        log_error(f'[PERIODIC_SUMMARY] Error starting periodic summary: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/periodic-summary/stop', methods=['POST'])
+def stop_periodic_summary():
+    """Stop the periodic summary timer"""
+    try:
+        global periodic_summary_enabled
+        periodic_summary_enabled = False
+        
+        log_info('[PERIODIC_SUMMARY] Periodic summary stopped')
+        
+        # Broadcast status to all clients
+        broadcast_to_clients('periodic_summary_status', {'active': False})
+        
+        return jsonify({'success': True, 'message': 'Periodic summary stopped'})
+    except Exception as e:
+        log_error(f'[PERIODIC_SUMMARY] Error stopping periodic summary: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/periodic-summary/status', methods=['GET'])
+def get_periodic_summary_status():
+    """Get the current status of periodic summary"""
+    try:
+        global periodic_summary_enabled
+        return jsonify({
+            'success': True,
+            'active': periodic_summary_enabled,
+            'message': 'Periodic summary is ' + ('active' if periodic_summary_enabled else 'inactive')
+        })
+    except Exception as e:
+        log_error(f'[PERIODIC_SUMMARY] Error getting status: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/classes', methods=['GET'])
@@ -958,6 +1017,12 @@ def overall_status_timer():
     """Timer for updating overall status every 20 seconds"""
     while True:
         try:
+            # Only generate summary if periodic summary is enabled
+            global periodic_summary_enabled
+            if not periodic_summary_enabled:
+                time.sleep(20)
+                continue
+                
             # Generate comprehensive summary using stored analysis results
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

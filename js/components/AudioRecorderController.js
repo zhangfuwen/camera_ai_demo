@@ -464,7 +464,7 @@ export class AudioRecorderController {
         }
         
         // Make it visible
-        logContainer.classList.remove('hidden');
+        // logContainer.classList.remove('hidden');
         
         // Add styles for different log types
         const style = document.createElement('style');

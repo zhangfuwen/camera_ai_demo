@@ -16,6 +16,7 @@ import { MosaicEffectController } from './components/MosaicEffectController.js';
 import { VideoRecorderController } from './components/VideoRecorderController.js';
 import { AudioRecorderController } from './components/AudioRecorderController.js';
 import { StreamController } from './components/StreamController.js';
+import { PeriodicSummaryController } from './components/PeriodicSummaryController.js';
 
 // Application state - exposed to window for component communication
 window.app = {
@@ -30,6 +31,7 @@ window.app = {
     videoRecorderController: null,
     audioRecorderController: null,
     streamController: null,
+    periodicSummaryController: null,
     isInitialized: false
 };
 
@@ -59,6 +61,7 @@ async function init() {
         app.videoRecorderController = new VideoRecorderController();
         app.audioRecorderController = new AudioRecorderController();
         app.streamController = new StreamController();
+        app.periodicSummaryController = new PeriodicSummaryController();
         
         // Initialize components
         await initializeComponents();
@@ -121,6 +124,9 @@ async function initializeComponents() {
     
     // Initialize stream controller
     app.streamController.initialize();
+    
+    // Initialize periodic summary controller
+    app.periodicSummaryController.initialize();
 }
 
 /**
@@ -188,6 +194,12 @@ function setupEventDelegation() {
         if (target.matches('#food-detection-btn')) {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('toggleFoodDetection'));
+        }
+        
+        // Periodic summary controls
+        if (target.matches('#periodic-summary-btn')) {
+            event.preventDefault();
+            document.dispatchEvent(new CustomEvent('togglePeriodicSummary'));
         }
         
         // Mosaic effect controls
@@ -449,6 +461,11 @@ function setupEventDelegation() {
             case 'C':
                 event.preventDefault();
                 document.dispatchEvent(new CustomEvent('toggleCalorieEstimation'));
+                break;
+            case 'p':
+            case 'P':
+                event.preventDefault();
+                document.dispatchEvent(new CustomEvent('togglePeriodicSummary'));
                 break;
             case 'ArrowUp':
                 event.preventDefault();
