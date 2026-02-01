@@ -187,6 +187,9 @@ export class AudioRecorderController {
             this.updateUI();
             this.updateStatus('Audio recording: Active');
             this.addUploadLog('Audio recording started', 'success');
+            
+            // Update voice information in health overlay
+            this.updateVoiceInfo('正在录音...', '音频处理中...');
 
             // Set up interval to process recordings every 10 seconds
             this.recordingInterval = setInterval(() => {
@@ -231,6 +234,9 @@ export class AudioRecorderController {
         this.updateUI();
         this.updateStatus('Audio recording: Stopped');
         this.addUploadLog('Audio recording stopped', 'info');
+        
+        // Update voice information in health overlay
+        this.updateVoiceInfo('录音已停止', '音频处理完成');
     }
 
     /**
@@ -240,6 +246,10 @@ export class AudioRecorderController {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             console.log('Processing current audio recording chunk...');
             
+            // Update voice information to show processing
+            const timestamp = new Date().toLocaleTimeString();
+            this.updateVoiceInfo('正在处理音频...', `处理时间: ${timestamp}`);
+            
             // Stop current MediaRecorder
             this.mediaRecorder.stop();
             
@@ -247,6 +257,8 @@ export class AudioRecorderController {
             setTimeout(() => {
                 if (this.isRecording) {
                     this.startNewRecordingChunk();
+                    // Update voice info to show new recording started
+                    this.updateVoiceInfo('继续录音...', '音频采集中...');
                 }
             }, 100); // Small delay to ensure clean transition
         }
@@ -448,32 +460,16 @@ export class AudioRecorderController {
      * Create upload log container in the UI
      */
     createUploadLogContainer() {
-        // Find the audio recorder section
-        const audioRecorderSection = document.querySelector('#record-audio-btn').closest('.accordion-content');
-        if (!audioRecorderSection) {
-            console.error('Could not find audio recorder section for log container');
+        // Find the upload log container that should already exist in the HTML
+        let logContainer = document.getElementById('audio-upload-log-container');
+        if (!logContainer) {
+            console.error('Could not find audio upload log container');
             return null;
         }
-
-        // Create log container
-        const logContainer = document.createElement('div');
-        logContainer.id = 'audio-upload-log-container';
-        logContainer.className = 'mt-4 p-3 bg-gray-900 rounded border border-gray-700 max-h-48 overflow-y-auto';
         
-        // Add title
-        const title = document.createElement('div');
-        title.className = 'text-sm font-bold text-gray-300 mb-2';
-        title.textContent = 'Audio Upload Log:';
-        logContainer.appendChild(title);
-
-        // Insert before the recording status
-        const statusDiv = document.getElementById('audio-recording-status');
-        if (statusDiv) {
-            statusDiv.parentNode.insertBefore(logContainer, statusDiv.nextSibling);
-        } else {
-            audioRecorderSection.appendChild(logContainer);
-        }
-
+        // Make it visible
+        logContainer.classList.remove('hidden');
+        
         // Add styles for different log types
         const style = document.createElement('style');
         style.textContent = `
@@ -566,5 +562,23 @@ export class AudioRecorderController {
             isUploading: this.isUploading,
             recordingDuration: this.recordingDuration
         };
+    }
+
+    /**
+     * Update voice information in health overlay
+     */
+    updateVoiceInfo(info1, info2) {
+        const voiceInfo1 = document.getElementById('voice-info-1');
+        const voiceInfo2 = document.getElementById('voice-info-2');
+        
+        if (voiceInfo1) {
+            voiceInfo1.textContent = `语音信息 ${info1}`;
+        }
+        
+        if (voiceInfo2) {
+            voiceInfo2.textContent = `语音信息 ${info2}`;
+        }
+        
+        console.log(`Voice info updated: ${info1}, ${info2}`);
     }
 }

@@ -16,6 +16,100 @@ import random
 import asyncio
 from flask_socketio import SocketIO, emit
 from openai import OpenAI
+import inspect
+import logging
+import sys
+
+# Configure logging system
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter with colors for different log levels"""
+    
+    COLORS = {
+        'VERBOSE': '\033[36m',      # Cyan
+        'DEBUG': '\033[35m',        # Magenta
+        'INFO': '\033[32m',         # Green
+        'WARNING': '\033[33m',      # Yellow
+        'ERROR': '\033[31m',        # Red
+        'CRITICAL': '\033[41m',     # Red background
+        'RESET': '\033[0m'          # Reset
+    }
+    
+    def format(self, record):
+        log_color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+        reset = self.COLORS['RESET']
+        
+        # Add line number from extra field if available
+        line_no = getattr(record, 'line_no', '?')
+        
+        return f"{log_color}[{record.levelname:8}][LINE {line_no}] {record.getMessage()}{reset}"
+
+# Add VERBOSE level to logging
+logging.VERBOSE = 5  # Lower than DEBUG (10)
+logging.addLevelName(logging.VERBOSE, 'VERBOSE')
+
+def verbose(self, message, *args, **kwargs):
+    if self.isEnabledFor(logging.VERBOSE):
+        self._log(logging.VERBOSE, message, args, **kwargs)
+
+logging.Logger.verbose = verbose
+
+# Create logger with line number support
+def get_logger_with_line(name='food_detection_server'):
+    """Get logger that automatically includes line numbers"""
+    logger = logging.getLogger(name)
+    
+    if not logger.handlers:
+        # Create console handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.VERBOSE)
+        
+        # Create colored formatter
+        formatter = ColoredFormatter()
+        console_handler.setFormatter(formatter)
+        
+        # Add handler to logger
+        logger.addHandler(console_handler)
+        
+        # Set logger level to INFO by default
+        logger.setLevel(logging.INFO)
+        
+        # Prevent propagation to avoid duplicate logs
+        logger.propagate = False
+    
+    return logger
+
+# Create global logger
+logger = get_logger_with_line()
+
+def log_with_line(level, message):
+    """Log message with automatic line number detection"""
+    # Go back 2 frames to get the original caller
+    frame = inspect.currentframe().f_back.f_back
+    line_number = frame.f_lineno
+    
+    # Create a LogRecord with line number
+    record = logger.makeRecord(
+        logger.name, level, '', 0, message, (), None
+    )
+    record.line_no = line_number
+    
+    logger.handle(record)
+
+# Convenience methods
+def log_verbose(message):
+    log_with_line(logging.VERBOSE, message)
+
+def log_debug(message):
+    log_with_line(logging.DEBUG, message)
+
+def log_info(message):
+    log_with_line(logging.INFO, message)
+
+def log_warning(message):
+    log_with_line(logging.WARNING, message)
+
+def log_error(message):
+    log_with_line(logging.ERROR, message)
 
 app = Flask(__name__, static_folder='.', template_folder='.')
 CORS(app)  # Enable CORS for all routes
@@ -43,6 +137,7 @@ MAX_STORED_RESULTS = 50  # Keep last 50 results of each type
 
 # Connected clients
 connected_clients = set()
+max_clients = 10  # Limit maximum concurrent connections
 
 # Gemini client configuration (using OpenAI library)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'sk-EplRjGkWQ9CwXK5w10936448E56a46BcB487EeE809C6Bd40')
@@ -53,9 +148,9 @@ try:
         api_key=GEMINI_API_KEY,
         base_url="https://api.apiyi.com/v1"
     )
-    print('[GEMINI] Client initialized successfully with OpenAI library')
+    log_info('[GEMINI] Client initialized successfully with OpenAI library')
 except Exception as e:
-    print(f'[GEMINI] Failed to initialize client: {e}')
+    log_error(f'[GEMINI] Failed to initialize client: {e}')
     gemini_client = None
 
 # Load the trained food detection model
@@ -68,34 +163,34 @@ model_path = "./food_detection_training/yolov8n-seg.pt"
 model_path = "yolo26x.pt"
 fallback_model_path = "yolov8n.pt"
 
-print("Loading food detection model...")
+log_info("Loading food detection model...")
 try:
     model = YOLO(model_path)
-    print(f"Loaded trained model from {model_path}")
+    log_info(f"Loaded trained model from {model_path}")
 except Exception as e:
-    print(f"Could not load trained model: {e}")
-    print(f"Loading default YOLOv8 model instead...")
+    log_warning(f"Could not load trained model: {e}")
+    log_info(f"Loading default YOLOv8 model instead...")
     model = YOLO(fallback_model_path)
 
 # Get the model's class names
 try:
     class_names = model.names  # This gets the class names from the trained model
-    print(f"Model loaded with {len(class_names)} classes: {list(class_names.values())}")
+    log_info(f"Model loaded with {len(class_names)} classes")
 except:
     class_names = {}  # Fallback if class names aren't available
-    print("Could not retrieve class names from model")
+    log_warning("Could not retrieve class names from model")
 
 # Create upload directory for videos if it doesn't exist
 UPLOAD_FOLDER = 'recorded_videos'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
-    print(f"Created upload directory: {UPLOAD_FOLDER}")
+    log_info(f"Created upload directory: {UPLOAD_FOLDER}")
 
 # Create upload directory for audio if it doesn't exist
 AUDIO_UPLOAD_FOLDER = 'recorded_audio'
 if not os.path.exists(AUDIO_UPLOAD_FOLDER):
     os.makedirs(AUDIO_UPLOAD_FOLDER)
-    print(f"Created audio upload directory: {AUDIO_UPLOAD_FOLDER}")
+    log_info(f"Created audio upload directory: {AUDIO_UPLOAD_FOLDER}")
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['AUDIO_UPLOAD_FOLDER'] = AUDIO_UPLOAD_FOLDER
@@ -149,7 +244,7 @@ def detect_food():
         if img is None:
             return jsonify({"success": False, "error": "Could not decode image"}), 400
 
-        print("Image shape:", img.shape)
+        log_debug("Image shape:" + str(img.shape))
         
         # Perform segmentation with YOLO
         results = model(img, conf=0.1)  # Confidence threshold of 0.5
@@ -322,27 +417,27 @@ def upload_video():
     """
     try:
         # Log request received
-        print(f"[VIDEO UPLOAD] Request received at {datetime.now().isoformat()}")
-        print(f"[VIDEO UPLOAD] Request headers: {dict(request.headers)}")
-        print(f"[VIDEO UPLOAD] Request form data keys: {list(request.form.keys())}")
-        print(f"[VIDEO UPLOAD] Request files keys: {list(request.files.keys())}")
+        log_verbose(f"[VIDEO UPLOAD] Request received at {datetime.now().isoformat()}")
+        log_debug(f"[VIDEO UPLOAD] Request headers: {dict(request.headers)}")
+        log_debug(f"[VIDEO UPLOAD] Request form data keys: {list(request.form.keys())}")
+        log_debug(f"[VIDEO UPLOAD] Request files keys: {list(request.files.keys())}")
         
         # Check if video file is in the request
         if 'video' not in request.files:
-            print(f"[VIDEO UPLOAD] ERROR: No video file in request")
+            log_error(f"[VIDEO UPLOAD] ERROR: No video file in request")
             return jsonify({"success": False, "error": "No video file provided"}), 400
         
         video_file = request.files['video']
-        print(f"[VIDEO UPLOAD] Video file received: {video_file.filename}")
-        print(f"[VIDEO UPLOAD] Video file content type: {video_file.content_type}")
+        log_info(f"[VIDEO UPLOAD] Video file received: {video_file.filename}")
+        log_debug(f"[VIDEO UPLOAD] Video file content type: {video_file.content_type}")
         
         if video_file.filename == '':
-            print(f"[VIDEO UPLOAD] ERROR: Empty filename")
+            log_error(f"[VIDEO UPLOAD] ERROR: Empty filename")
             return jsonify({"success": False, "error": "No video file selected"}), 400
         
         # Get timestamp from form data or generate one
         timestamp = request.form.get('timestamp', datetime.now().isoformat())
-        print(f"[VIDEO UPLOAD] Client timestamp: {timestamp}")
+        log_debug(f"[VIDEO UPLOAD] Client timestamp: {timestamp}")
         
         # Secure the filename and ensure it has the correct extension
         filename = werkzeug.utils.secure_filename(video_file.filename)
@@ -355,31 +450,31 @@ def upload_video():
         
         # Save the file
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
-        print(f"[VIDEO UPLOAD] Saving file to: {file_path}")
+        log_debug(f"[VIDEO UPLOAD] Saving file to: {file_path}")
         
         video_file.save(file_path)
         
         # Get file size for logging
         file_size = os.path.getsize(file_path)
-        print(f"[VIDEO UPLOAD] File saved successfully: {saved_filename}")
-        print(f"[VIDEO UPLOAD] File size: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
-        print(f"[VIDEO UPLOAD] Full path: {os.path.abspath(file_path)}")
+        log_info(f"[VIDEO UPLOAD] File saved successfully: {saved_filename}")
+        log_info(f"[VIDEO UPLOAD] File size: {file_size / 1024 / 1024:.2f} MB")
+        log_debug(f"[VIDEO UPLOAD] Full path: {os.path.abspath(file_path)}")
         
         # List files in upload directory for verification
         try:
             existing_files = os.listdir(app.config['UPLOAD_FOLDER'])
-            print(f"[VIDEO UPLOAD] Total files in upload directory: {len(existing_files)}")
+            log_debug(f"[VIDEO UPLOAD] Total files in upload directory: {len(existing_files)}")
             if len(existing_files) <= 5:  # Only list if not too many files
-                print(f"[VIDEO UPLOAD] Files: {sorted(existing_files)}")
+                log_verbose(f"[VIDEO UPLOAD] Files: {sorted(existing_files)}")
         except Exception as e:
-            print(f"[VIDEO UPLOAD] Warning: Could not list directory contents: {e}")
+            log_warning(f"[VIDEO UPLOAD] Warning: Could not list directory contents: {e}")
         
-        print(f"[VIDEO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
+        log_info(f"[VIDEO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
         
         # Trigger Gemini video analysis in background
         gemini_thread = threading.Thread(target=run_gemini_video_analysis, args=(file_path,), daemon=True)
         gemini_thread.start()
-        print(f"[GEMINI] Started video analysis for: {saved_filename}")
+        log_info(f"[GEMINI] Started video analysis for: {saved_filename}")
         
         return jsonify({
             "success": True,
@@ -390,10 +485,10 @@ def upload_video():
         })
     
     except Exception as e:
-        print(f"[VIDEO UPLOAD] ERROR: {str(e)}")
-        print(f"[VIDEO UPLOAD] Error type: {type(e).__name__}")
+        log_error(f"[VIDEO UPLOAD] ERROR: {str(e)}")
+        log_error(f"[VIDEO UPLOAD] Error type: {type(e).__name__}")
         import traceback
-        print(f"[VIDEO UPLOAD] Traceback: {traceback.format_exc()}")
+        log_debug(f"[VIDEO UPLOAD] Traceback: {traceback.format_exc()}")
         app.logger.error(f"Error in upload_video: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -417,27 +512,27 @@ def upload_audio():
     """
     try:
         # Log request received
-        print(f"[AUDIO UPLOAD] Request received at {datetime.now().isoformat()}")
-        print(f"[AUDIO UPLOAD] Request headers: {dict(request.headers)}")
-        print(f"[AUDIO UPLOAD] Request form data keys: {list(request.form.keys())}")
-        print(f"[AUDIO UPLOAD] Request files keys: {list(request.files.keys())}")
+        log_verbose(f"[AUDIO UPLOAD] Request received at {datetime.now().isoformat()}")
+        log_debug(f"[AUDIO UPLOAD] Request headers: {dict(request.headers)}")
+        log_debug(f"[AUDIO UPLOAD] Request form data keys: {list(request.form.keys())}")
+        log_debug(f"[AUDIO UPLOAD] Request files keys: {list(request.files.keys())}")
         
         # Check if audio file is in the request
         if 'audio' not in request.files:
-            print(f"[AUDIO UPLOAD] ERROR: No audio file in request")
+            log_error(f"[AUDIO UPLOAD] ERROR: No audio file in request")
             return jsonify({"success": False, "error": "No audio file provided"}), 400
         
         audio_file = request.files['audio']
-        print(f"[AUDIO UPLOAD] Audio file received: {audio_file.filename}")
-        print(f"[AUDIO UPLOAD] Audio file content type: {audio_file.content_type}")
+        log_debug(f"[AUDIO UPLOAD] Audio file received: {audio_file.filename}")
+        log_debug(f"[AUDIO UPLOAD] Audio file content type: {audio_file.content_type}")
         
         if audio_file.filename == '':
-            print(f"[AUDIO UPLOAD] ERROR: Empty filename")
+            log_error(f"[AUDIO UPLOAD] ERROR: Empty filename")
             return jsonify({"success": False, "error": "No audio file selected"}), 400
         
         # Get timestamp from form data or generate one
         timestamp = request.form.get('timestamp', datetime.now().isoformat())
-        print(f"[AUDIO UPLOAD] Client timestamp: {timestamp}")
+        log_debug(f"[AUDIO UPLOAD] Client timestamp: {timestamp}")
         
         # Secure the filename and ensure it has the correct extension
         filename = werkzeug.utils.secure_filename(audio_file.filename)
@@ -450,31 +545,31 @@ def upload_audio():
         
         # Save the file
         file_path = os.path.join(app.config['AUDIO_UPLOAD_FOLDER'], saved_filename)
-        print(f"[AUDIO UPLOAD] Saving file to: {file_path}")
+        log_debug(f"[AUDIO UPLOAD] Saving file to: {file_path}")
         
         audio_file.save(file_path)
         
         # Get file size for logging
         file_size = os.path.getsize(file_path)
-        print(f"[AUDIO UPLOAD] File saved successfully: {saved_filename}")
-        print(f"[AUDIO UPLOAD] File size: {file_size} bytes ({file_size / 1024:.2f} KB)")
-        print(f"[AUDIO UPLOAD] Full path: {os.path.abspath(file_path)}")
+        log_debug(f"[AUDIO UPLOAD] File saved successfully: {saved_filename}")
+        log_debug(f"[AUDIO UPLOAD] File size: {file_size / 1024:.2f} KB")
+        log_debug(f"[AUDIO UPLOAD] Full path: {os.path.abspath(file_path)}")
         
         # List files in upload directory for verification
         try:
             existing_files = os.listdir(app.config['AUDIO_UPLOAD_FOLDER'])
-            print(f"[AUDIO UPLOAD] Total files in audio upload directory: {len(existing_files)}")
+            log_debug(f"[AUDIO UPLOAD] Total files in audio upload directory: {len(existing_files)}")
             if len(existing_files) <= 5:  # Only list if not too many files
-                print(f"[AUDIO UPLOAD] Files: {sorted(existing_files)}")
+                log_verbose(f"[AUDIO UPLOAD] Files: {sorted(existing_files)}")
         except Exception as e:
-            print(f"[AUDIO UPLOAD] Warning: Could not list directory contents: {e}")
+            log_warning(f"[AUDIO UPLOAD] Warning: Could not list directory contents: {e}")
         
-        print(f"[AUDIO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
+        log_debug(f"[AUDIO UPLOAD] Upload completed successfully at {datetime.now().isoformat()}")
         
         # Trigger Gemini audio analysis in background
         gemini_thread = threading.Thread(target=run_gemini_audio_analysis, args=(file_path,), daemon=True)
         gemini_thread.start()
-        print(f"[GEMINI] Started audio analysis for: {saved_filename}")
+        log_debug(f"[GEMINI] Started audio analysis for: {saved_filename}")
         
         return jsonify({
             "success": True,
@@ -485,10 +580,10 @@ def upload_audio():
         })
     
     except Exception as e:
-        print(f"[AUDIO UPLOAD] ERROR: {str(e)}")
-        print(f"[AUDIO UPLOAD] Error type: {type(e).__name__}")
+        log_error(f"[AUDIO UPLOAD] ERROR: {str(e)}")
+        log_error(f"[AUDIO UPLOAD] Error type: {type(e).__name__}")
         import traceback
-        print(f"[AUDIO UPLOAD] Traceback: {traceback.format_exc()}")
+        log_debug(f"[AUDIO UPLOAD] Traceback: {traceback.format_exc()}")
         app.logger.error(f"Error in upload_audio: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -516,14 +611,42 @@ def get_classes():
 # WebSocket events
 @socketio.on('connect')
 def handle_connect():
-    print(f'[STREAM] Client connected: {request.sid}')
-    connected_clients.add(request.sid)
-    emit('status', {'message': 'Connected to stream'})
+    client_id = request.sid
+    
+    # Log connection details for debugging
+    log_info(f'[STREAM] New connection attempt - Client: {client_id}, Current: {len(connected_clients)}/{max_clients}')
+    
+    # Check if we've reached the maximum number of clients
+    if len(connected_clients) >= max_clients:
+        log_warning(f'[STREAM] Connection rejected - max clients ({max_clients}) reached. Client: {client_id}')
+        emit('error', {'message': f'Server is at maximum capacity ({max_clients} clients)'})
+        return False  # This will disconnect the client
+    
+    # Check if this client is already connected (duplicate connection)
+    if client_id in connected_clients:
+        log_warning(f'[STREAM] Duplicate connection detected: {client_id}')
+        return False
+    
+    log_info(f'[STREAM] Client connected: {client_id} (Total: {len(connected_clients) + 1})')
+    connected_clients.add(client_id)
+    
+    # Send current status to new client
+    emit('status', {'message': 'Connected to stream', 'client_count': len(connected_clients)})
+    
+    # Broadcast updated client count to all clients
+    broadcast_to_clients('client_update', {'count': len(connected_clients)})
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print(f'[STREAM] Client disconnected: {request.sid}')
-    connected_clients.discard(request.sid)
+    client_id = request.sid
+    if client_id in connected_clients:
+        connected_clients.discard(client_id)
+        log_info(f'[STREAM] Client disconnected: {client_id} (Total: {len(connected_clients)})')
+        
+        # Broadcast updated client count to all clients
+        broadcast_to_clients('client_update', {'count': len(connected_clients)})
+    else:
+        log_debug(f'[STREAM] Unknown client disconnected: {client_id}')
 
 @socketio.on('heartbeat')
 def handle_heartbeat():
@@ -538,7 +661,9 @@ def broadcast_to_clients(message_type, content):
             'timestamp': datetime.now().isoformat()
         }
         socketio.emit('stream_update', message)
-        print(f'[STREAM] Broadcasted {message_type} to {len(connected_clients)} clients')
+        log_debug(f'[STREAM] Broadcasted {message_type} to {len(connected_clients)} clients')
+        if message_type == 'audio_detect':
+            log_info(f'[STREAM] Broadcasted {message_type} to {len(connected_clients)} clients')
 
 # Global variables for realistic sensor data simulation
 sensor_state = {
@@ -607,7 +732,7 @@ def generate_emotion_html():
 强度: {latest_emotion['intensity']}
 检测时间: {datetime.fromisoformat(latest_emotion['timestamp']).strftime('%H:%M:%S')}"""
     else:
-        print("[EMOTION] No emotion analysis results available", analysis_results['emotion_history'])
+        log_debug("[EMOTION] No emotion analysis results available")
         # Fallback if no analysis results available
         return "情绪状态: 等待分析数据..."
 
@@ -622,7 +747,7 @@ def generate_audio_detection_html():
 音质: {latest_audio['voice_quality']}
 分析时间: {datetime.fromisoformat(latest_audio['timestamp']).strftime('%H:%M:%S')}"""
     else:
-        print("[AUDIO] No audio analysis results available", analysis_results['audio_analysis'])
+        log_debug("[AUDIO] No audio analysis results available")
         # Fallback if no analysis results available
         return "音频分析: 等待分析数据..."
 
@@ -677,7 +802,7 @@ def sensor_update_timer():
             broadcast_to_clients('sensor_update', html_content)
             time.sleep(1)
         except Exception as e:
-            print(f'[STREAM] Error in sensor timer: {e}')
+            log_warning(f'[STREAM] Error in sensor timer: {e}')
             time.sleep(1)
 
 def emotion_update_timer():
@@ -688,7 +813,7 @@ def emotion_update_timer():
             broadcast_to_clients('emotion_update', html_content)
             time.sleep(3)
         except Exception as e:
-            print(f'[STREAM] Error in emotion timer: {e}')
+            log_warning(f'[STREAM] Error in emotion timer: {e}')
             time.sleep(3)
 
 def overall_status_timer():
@@ -706,14 +831,14 @@ def overall_status_timer():
                 loop.close()
             time.sleep(20)
         except Exception as e:
-            print(f'[STREAM] Error in overall status timer: {e}')
+            log_warning(f'[STREAM] Error in overall status timer: {e}')
             time.sleep(20)
 
 def comprehensive_summary_timer():
     """Timer for generating comprehensive summaries every 5 minutes"""
     while True:
         try:
-            print('[SUMMARY] Starting comprehensive summary generation...')
+            log_info('[SUMMARY] Starting comprehensive summary generation...')
             # Generate comprehensive summary using stored analysis results
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -721,19 +846,19 @@ def comprehensive_summary_timer():
                 summary_text = loop.run_until_complete(generate_comprehensive_summary())
                 summary_html = generate_summary_html(summary_text)
                 broadcast_to_clients('overall_status', summary_html)
-                print('[SUMMARY] Comprehensive summary generated and broadcasted')
+                log_info('[SUMMARY] Comprehensive summary generated and broadcasted')
             finally:
                 loop.close()
             time.sleep(300)  # 5 minutes
         except Exception as e:
-            print(f'[SUMMARY] Error in comprehensive summary timer: {e}')
+            log_error(f'[SUMMARY] Error in comprehensive summary timer: {e}')
             time.sleep(300)
 
 async def analyze_video_with_gemini(video_path):
     """Analyze video using Gemini model"""
     try:
         if not gemini_client:
-            print('[GEMINI] Client not available, using fallback')
+            log_warning('[GEMINI] Client not available, using fallback')
             # Fallback to mock data
             html_content = generate_video_detection_html()
             broadcast_to_clients('video_detect', html_content)
@@ -741,28 +866,28 @@ async def analyze_video_with_gemini(video_path):
             broadcast_to_clients('emotion_update', emotion_html)
             return
         
-        print(f'[GEMINI] Analyzing video: {video_path}')
+        log_info(f'[GEMINI] Analyzing video: {video_path}')
         
         # Check if file exists and get file info
         import os
         if not os.path.exists(video_path):
-            print(f'[GEMINI] Error: Video file does not exist: {video_path}')
+            log_error(f'[GEMINI] Error: Video file does not exist: {video_path}')
             return
         
         file_size = os.path.getsize(video_path)
-        print(f'[GEMINI] Video file info - Path: {video_path}, Size: {file_size} bytes')
+        log_debug(f'[GEMINI] Video file info - Path: {video_path}, Size: {file_size} bytes')
         
         # Test Gemini client connectivity
         try:
-            print(f'[GEMINI] Testing client connectivity...')
+            log_debug(f'[GEMINI] Testing client connectivity...')
             test_response = gemini_client.chat.completions.create(
                 model='gemini-3-pro-preview',
                 messages=[{"role": "user", "content": "Hello, this is a test."}],
                 max_tokens=50
             )
-            print(f'[GEMINI] Client connectivity test passed')
+            log_debug(f'[GEMINI] Client connectivity test passed')
         except Exception as e:
-            print(f'[GEMINI] Client connectivity test failed: {e}')
+            log_error(f'[GEMINI] Client connectivity test failed: {e}')
             return
         
         # Read and encode video file
@@ -770,9 +895,9 @@ async def analyze_video_with_gemini(video_path):
             with open(video_path, "rb") as f:
                 video_b64 = base64.b64encode(f.read()).decode()
                 video_url = f"data:video/mp4;base64,{video_b64}"
-            print(f'[GEMINI] Video encoded successfully')
+            log_debug(f'[GEMINI] Video encoded successfully')
         except Exception as e:
-            print(f'[GEMINI] Error encoding video: {e}')
+            log_error(f'[GEMINI] Error encoding video: {e}')
             return
         
         # Analyze video content
@@ -1138,31 +1263,30 @@ async def analyze_audio_with_gemini(audio_path):
     """Analyze audio using Gemini model"""
     try:
         if not gemini_client:
-            print('[GEMINI] Client not available, using fallback')
+            log_error('[GEMINI] Client not available, using fallback')
             # Fallback to mock data
             html_content = generate_audio_detection_html()
             broadcast_to_clients('audio_detect', html_content)
             return
-        
-        print(f'[GEMINI] Analyzing audio: {audio_path}')
-        
-        # Check if file exists and get file info
+
+
+
+        # print file info
         import os
         if not os.path.exists(audio_path):
-            print(f'[GEMINI] Error: Audio file does not exist: {audio_path}')
+            log_error(f'[GEMINI] Error: Audio file does not exist: {audio_path}')
             return
-        
         file_size = os.path.getsize(audio_path)
-        print(f'[GEMINI] Audio file info - Path: {audio_path}, Size: {file_size} bytes')
-        
+        log_info(f'[GEMINI] Analyzing audio: {audio_path}, File Size: {file_size} bytes')
+
         # Read and encode audio file
         try:
             with open(audio_path, "rb") as f:
                 audio_b64 = base64.b64encode(f.read()).decode()
                 audio_url = f"data:audio/webm;base64,{audio_b64}"
-            print(f'[GEMINI] Audio encoded successfully')
+            log_info(f'[GEMINI] Audio encoded successfully')
         except Exception as e:
-            print(f'[GEMINI] Error encoding audio: {e}')
+            log_error(f'[GEMINI] Error encoding audio: {e}')
             return
         
         # Transcribe and analyze audio content
@@ -1210,7 +1334,7 @@ async def analyze_audio_with_gemini(audio_path):
         )
         
         analysis_text = response.choices[0].message.content
-        print(f'[GEMINI] Audio analysis completed successfully, {analysis_text}')
+        log_info(f'[GEMINI] Audio analysis completed successfully, {analysis_text}')
         
         # Parse JSON response
         try:
@@ -1255,11 +1379,11 @@ async def analyze_audio_with_gemini(audio_path):
             if len(speech_content) > 50:
                 speech_content = speech_content[:50] + "..."
                 
-            print(f'[GEMINI] Successfully parsed audio analysis JSON: {emotion_state}, {volume_level}')
+            log_info(f'[GEMINI] Successfully parsed audio analysis JSON: {emotion_state}, {volume_level}')
             
         except Exception as e:
-            print(f'[GEMINI] Error parsing audio analysis JSON: {e}')
-            print(f'[GEMINI] Raw response: {analysis_text}')
+            log_error(f'[GEMINI] Error parsing audio analysis JSON: {e}')
+            log_error(f'[GEMINI] Raw response: {analysis_text}')
             
             # Fallback values if JSON parsing fails
             speech_content = "解析失败"
@@ -1312,19 +1436,12 @@ async def analyze_audio_with_gemini(audio_path):
         if len(analysis_results['activity_history']) > MAX_STORED_RESULTS:
             analysis_results['activity_history'].pop(0)
         
-        print(f'[STORAGE] Stored audio analysis results. Total stored: {len(analysis_results["audio_analysis"])}')
-        
-        # Clean up uploaded file
-        try:
-            gemini_client.files.delete(uploaded_file.name)
-            print(f'[GEMINI] Cleaned up audio file: {uploaded_file.name}')
-        except:
-            pass
-        
-        print(f'[GEMINI] Audio analysis completed for: {audio_path}')
+        log_debug(f'[STORAGE] Stored audio analysis results. Total stored: {len(analysis_results["audio_analysis"])}')
+        log_debug(f'[GEMINI] Audio analysis completed for: {audio_path}')
+        broadcast_to_clients('audio_detect', audio_text)
         
     except Exception as e:
-        print(f'[GEMINI] Error analyzing audio: {e}')
+        log_error(f'[GEMINI] Error analyzing audio: {e}')
         # Fallback to mock data
         html_content = generate_audio_detection_html()
         broadcast_to_clients('audio_detect', html_content)
@@ -1348,28 +1465,49 @@ def run_gemini_audio_analysis(audio_path):
         loop.close()
 
 
+def cleanup_stale_connections():
+    """Clean up stale connections that might be hanging"""
+    while True:
+        try:
+            # Log current connection count every 30 seconds
+            log_info(f'[STREAM] Active connections: {len(connected_clients)}')
+            
+            # If we have too many connections, this might indicate a problem
+            if len(connected_clients) > max_clients * 0.8:
+                log_warning(f'[STREAM] High connection count detected: {len(connected_clients)}')
+            
+            time.sleep(30)  # Check every 30 seconds
+        except Exception as e:
+            log_error(f'[STREAM] Error in connection cleanup: {e}')
+            time.sleep(30)
+
 # Start background timers
 def start_background_timers():
     """Start all background timer threads"""
+    # Connection monitoring thread
+    cleanup_thread = threading.Thread(target=cleanup_stale_connections, daemon=True)
+    cleanup_thread.start()
+    log_info('[STREAM] Started connection monitoring (30s)')
+    
     # Sensor values timer (1 second)
     sensor_thread = threading.Thread(target=sensor_update_timer, daemon=True)
     sensor_thread.start()
-    print('[STREAM] Started sensor update timer (1s)')
+    log_info('[STREAM] Started sensor update timer (1s)')
 
     # Emotion update timer (3 seconds)
     emotion_thread = threading.Thread(target=emotion_update_timer, daemon=True)
     emotion_thread.start()
-    print('[STREAM] Started emotion update timer (3s)')
+    log_info('[STREAM] Started emotion update timer (3s)')
 
     # Overall status timer (20 seconds)
     status_thread = threading.Thread(target=overall_status_timer, daemon=True)
     status_thread.start()
-    print('[STREAM] Started overall status timer (20s)')
+    log_info('[STREAM] Started overall status timer (20s)')
 
     # Comprehensive summary timer (5 minutes)
     summary_thread = threading.Thread(target=comprehensive_summary_timer, daemon=True)
     summary_thread.start()
-    print('[SUMMARY] Started comprehensive summary timer (5m)')
+    log_info('[SUMMARY] Started comprehensive summary timer (5m)')
 
 
 if __name__ == '__main__':

@@ -146,6 +146,16 @@ function createUIComponents() {
     const cameraView = createComponent('camera-view-template');
     const cameraViewContainer = document.getElementById('camera-view-container');
     cameraViewContainer.appendChild(cameraView);
+    
+    // Create suggestion panel
+    const suggestionPanelTemplate = document.getElementById('suggestion-panel-template');
+    if (!suggestionPanelTemplate) {
+        throw new Error('Suggestion panel template not found');
+    }
+    
+    const suggestionPanel = createComponent('suggestion-panel-template');
+    const suggestionPanelContainer = document.getElementById('suggestion-panel-container');
+    suggestionPanelContainer.appendChild(suggestionPanel);
 }
 
 /**

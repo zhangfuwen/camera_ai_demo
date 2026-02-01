@@ -9,6 +9,13 @@
     <!-- Socket.IO client library -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #121212;
+        }
+        
         /* Custom styles for video elements that can't be handled by Tailwind */
         #main-video, #pip-video {
             transform: none;
@@ -107,530 +114,418 @@
         .block {
             transition: background-color 0.3s ease;
         }
+        
+        /* Custom slider styles */
+        .custom-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        
+        .custom-slider::-webkit-slider-track {
+            background: #444444;
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #00C853;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;n            margin-top: -6px;
+        }
+        
+        .custom-slider::-moz-range-track {
+            background: #444444;
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        .custom-slider::-moz-range-thumb {
+            background: #00C853;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            border: none;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .three-column-layout {
+                flex-direction: column;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .right-panel {
+                display: none;
+            }
+        }
     </style>
 </head>
-<body class="h-screen overflow-hidden bg-gray-900 text-white">
-    <div id="app" class="flex h-full">
-        <!-- Control Panel Container -->
-        <div id="control-panel-container" class="flex-shrink-0 w-[350px] min-w-[250px] max-w-[500px] transition-all duration-300 resize-x overflow-hidden"></div>
+<body class="h-screen overflow-hidden" style="background-color: #121212; font-family: 'Inter', -apple-system, sans-serif;">
+    <div id="app" class="flex h-full three-column-layout">
+        <!-- Left Control Panel (25% width) -->
+        <div id="control-panel-container" class="w-1/4 min-w-[300px] p-4" style="background-color: #1E1E1E;"></div>
         
-        <!-- Camera View Container -->
-        <div id="camera-view-container" class="flex-grow transition-all duration-300"></div>
+        <!-- Middle Video Area (50% width) -->
+        <div id="camera-view-container" class="w-1/2" style="margin: 0 8px;"></div>
         
-        <!-- Menu Toggle Button -->
-        <button id="menu-toggle-btn" class="fixed top-4 right-4 z-50 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-        </button>
-
-        <!-- Toggle Control Panel Button -->
-        <button id="toggle-control-panel-btn" class="absolute top-4 left-4 z-50 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            Hide Panel
-        </button>
-        <!-- Side Menu -->
-        <div id="side-menu" class="fixed top-0 right-0 h-full w-64 bg-gray-800 transform translate-x-full transition-transform duration-300 z-40">
-            <div class="p-4">
-                <h3 class="text-xl font-bold text-white mb-4">Menu</h3>
-                <ul class="space-y-2">
-                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">Home</a></li>
-                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">Settings</a></li>
-                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">Help</a></li>
-                    <li><a href="#" class="block py-2 px-4 text-white hover:bg-gray-700 rounded">About</a></li>
-                </ul>
-            </div>
-        </div>
+        <!-- Right Suggestion Panel (25% width) -->
+        <div id="suggestion-panel-container" class="w-1/4 min-w-[300px] p-4 right-panel" style="background-color: #1E1E1E;"></div>
+        
     </div>
 
     <!-- Templates for UI Components -->
     <template id="control-panel-template">
-        <div class="h-full w-full bg-gray-800 p-5 overflow-y-auto border-r border-gray-700 transition-all duration-300" id="control-panel">
+        <div class="h-full w-full p-4 overflow-y-auto" style="background-color: #1E1E1E;">
             <!-- Permission Prompt -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Permission Prompt</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div id="permission-prompt" class="text-center p-5 bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded">
-                        <p class="mb-3">Please grant camera permission to detect available cameras</p>
-                        <button id="request-permission-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Request Camera Permission
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Main Camera Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Main Camera</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div class="mb-4">
-                        <label for="main-camera-select" class="block mb-2 font-bold text-gray-300">Select Main Camera:</label>
-                        <select id="main-camera-select" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white" disabled>
-                            <option value="">-- Select a camera --</option>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="resolution-select" class="block mb-2 font-bold text-gray-300">Select Resolution:</label>
-                        <select id="resolution-select" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white" disabled>
-                            <option value="">-- Default resolution --</option>
-                            <option value="640x480">640x480 (VGA)</option>
-                            <option value="1280x720">1280x720 (720p HD)</option>
-                            <option value="1920x1080">1920x1080 (1080p Full HD)</option>
-                            <option value="3840x2160">3840x2160 (4K UHD)</option>
-                        </select>
-                    </div>
-                    <!-- Transform Controls for Main Camera -->
-                    <div id="transform-controls" class="mb-4">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label for="rotation-select" class="block mb-2 font-bold text-gray-300">Rotation:</label>
-                                <select id="rotation-select" class="w-full p-2 rounded border border-gray-600 bg-gray-700 text-white" disabled>
-                                    <option value="0">0°</option>
-                                    <option value="90">90°</option>
-                                    <option value="180">180°</option>
-                                    <option value="270">270°</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="mirror-toggle" class="block mb-2 font-bold text-gray-300">Mirror:</label>
-                                <div class="flex items-center">
-                                    <button id="mirror-toggle" class="w-full p-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded transition-colors" disabled>
-                                        <span id="mirror-status">Off</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Color Adjustment Controls -->
-                    <div id="color-adjustment-controls" class="mb-4 pt-4 border-t border-gray-700">
-                        <div class="grid grid-cols-1 gap-3">
-                            <div>
-                                <label for="brightness-slider" class="block mb-2 font-bold text-gray-300">Brightness:</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="range" id="brightness-slider" min="0" max="200" value="100" class="flex-grow">
-                                    <span id="brightness-value" class="text-sm w-12 text-right">100%</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="contrast-slider" class="block mb-2 font-bold text-gray-300">Contrast:</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="range" id="contrast-slider" min="0" max="200" value="100" class="flex-grow">
-                                    <span id="contrast-value" class="text-sm w-12 text-right">100%</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="saturation-slider" class="block mb-2 font-bold text-gray-300">Saturation:</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="range" id="saturation-slider" min="0" max="200" value="100" class="flex-grow">
-                                    <span id="saturation-value" class="text-sm w-12 text-right">100%</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="red-channel-slider" class="block mb-2 font-bold text-gray-300">Red Channel:</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="range" id="red-channel-slider" min="0" max="200" value="100" class="flex-grow">
-                                    <span id="red-channel-value" class="text-sm w-12 text-right">100%</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="green-channel-slider" class="block mb-2 font-bold text-gray-300">Green Channel:</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="range" id="green-channel-slider" min="0" max="200" value="100" class="flex-grow">
-                                    <span id="green-channel-value" class="text-sm w-12 text-right">100%</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="blue-channel-slider" class="block mb-2 font-bold text-gray-300">Blue Channel:</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="range" id="blue-channel-slider" min="0" max="200" value="100" class="flex-grow">
-                                    <span id="blue-channel-value" class="text-sm w-12 text-right">100%</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <button id="toggle-main-btn" class="w-full p-3 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
+            <div class="mb-6">
+                <div id="permission-prompt" class="text-center p-4 bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded">
+                    <p class="mb-3 text-white text-sm">Please grant camera permission to detect available cameras</p>
+                    <button id="request-permission-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center justify-center mx-auto">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Start Main Camera
+                        Request Camera Permission
                     </button>
-                    
-                    <!-- Mosaic Effect Controls -->
-                    <div class="mt-4 pt-4 border-t border-gray-700">
-                        <!-- Mosaic Blend Mode Selection -->
-                        <div class="mb-3">
-                            <label for="mosaic-blend-mode" class="block mb-2 font-bold text-gray-300">Mosaic Blend Mode:</label>
-                            <select id="mosaic-blend-mode" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white">
-                                <option value="source-over">Standard (Normal)</option>
-                                <option value="multiply">Multiply (Darker)</option>
-                                <option value="overlay">Overlay (Contrast)</option>
-                                <option value="soft-light">Soft Light (Gentle)</option>
-                                <option value="hard-light">Hard Light (Dramatic)</option>
-                                <option value="color-dodge">Color Dodge (Brighter)</option>
-                                <option value="color-burn">Color Burn (Darker)</option>
-                                <option value="screen">Screen (Lighter)</option>
-                                <option value="black-pixels">Black Pixels (Privacy)</option>
-                                <option value="simple-mask">Simple Mask (Cover)</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Mosaic Opacity Control -->
-                        <div class="mb-3">
-                            <label for="mosaic-opacity" class="block mb-2 font-bold text-gray-300">Mosaic Opacity:</label>
-                            <input type="range" id="mosaic-opacity" min="10" max="100" value="35" class="w-full mb-2">
-                            <div class="text-sm text-gray-400 text-center">
-                                <span id="mosaic-opacity-value">35%</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Mosaic Canvas Opacity Control -->
-                        <div class="mb-3">
-                            <label for="mosaic-canvas-opacity" class="block mb-2 font-bold text-gray-300">Canvas Overlay Opacity:</label>
-                            <input type="range" id="mosaic-canvas-opacity" min="0" max="100" value="50" class="w-full mb-2">
-                            <div class="text-sm text-gray-400 text-center">
-                                <span id="mosaic-canvas-opacity-value">50%</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Mosaic Change Frequency Control -->
-                        <div class="mb-3">
-                            <label for="mosaic-change-frequency" class="block mb-2 font-bold text-gray-300">Change Frequency:</label>
-                            <input type="range" id="mosaic-change-frequency" min="1" max="60" value="10" class="w-full mb-2">
-                            <div class="text-sm text-gray-400 text-center">
-                                <span id="mosaic-change-frequency-value">10 frames</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Pixel Size Control -->
-                        <div class="mb-3">
-                            <label for="pixel-size-slider" class="block mb-2 font-bold text-gray-300">Pixel Size:</label>
-                            <div class="flex items-center space-x-2">
-                                <input type="range" id="pixel-size-slider" min="5" max="50" value="20" class="flex-grow">
-                                <span id="pixel-size-value" class="text-sm w-12 text-right">20px</span>
-                            </div>
-                        </div>
-                        
-                        <button id="toggle-mosaic-btn" class="w-full p-3 mb-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            Enable Mosaic
-                        </button>
-                        
-                        <!-- Red Canvas Toggle Button -->
-                        <button id="toggle-red-canvas-btn" class="w-full p-3 mb-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            Fill Canvas Red
-                        </button>
-                        
-                        <!-- Save Canvas Button -->
-                        <button id="save-canvas-btn" class="w-full p-3 mb-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Save Canvas as JPEG
-                        </button>
+                </div>
+            </div>
+            
+            <!-- Main Camera Title -->
+            <h2 class="text-white font-bold text-lg mb-4" style="margin-top: 16px;">Main Camera</h2>
+            
+            <!-- Camera Selection Dropdowns -->
+            <div class="space-y-3 mb-6">
+                <div>
+                    <select id="main-camera-select" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
+                        <option value="">USB Camera (1.0.0.0)</option>
+                        <option value="">-- Select a camera --</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <select id="resolution-select" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
+                        <option value="">default-resolution</option>
+                        <option value="640x480">640x480 (VGA)</option>
+                        <option value="1280x720">1280x720 (720p HD)</option>
+                        <option value="1920x1080">1920x1080 (1080p Full HD)</option>
+                        <option value="3840x2160">3840x2160 (4K UHD)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <select id="ratiocut-select" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
+                        <option value="0">0*</option>
+                        <option value="90">90*</option>
+                        <option value="180">180*</option>
+                        <option value="270">270*</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <div class="flex items-center justify-between p-3 rounded" style="background-color: #1E1E1E; border: 1px solid #444;">
+                        <span class="text-white">Mirror</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="mirror-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                        </label>
                     </div>
                 </div>
             </div>
-
-            <!-- PIP Camera Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>PIP Camera</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div class="mb-4">
-                        <label for="pip-camera-select" class="block mb-2 font-bold text-gray-300">Select PIP Camera:</label>
-                        <select id="pip-camera-select" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white" disabled>
-                            <option value="">-- Select a camera --</option>
-                        </select>
+            
+            <!-- Color Adjustment Sliders -->
+            <div class="space-y-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Brightness</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="brightness-slider" min="0" max="100" value="100" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">100%</span>
                     </div>
-                    <button id="toggle-pip-camera-btn" class="w-full p-3 mb-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Contrast</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="contrast-slider" min="0" max="100" value="100" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">100%</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Saturation</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="saturation-slider" min="0" max="100" value="97" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">97%</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Red Channel</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="red-channel-slider" min="0" max="100" value="100" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">100%</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Green Channel</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="green-channel-slider" min="0" max="100" value="100" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">100%</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Blue Channel</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="blue-channel-slider" min="0" max="100" value="100" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">100%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Action Button -->
+            <button id="toggle-main-btn" class="w-full p-3 mb-6 text-white font-bold rounded transition-colors" style="background-color: #FF0000; height: 40px; border-radius: 4px;">
+                Stop Main Camera
+            </button>
+            
+            <!-- PIP Camera Section -->
+            <div class="mb-6">
+                <h3 class="text-white font-bold text-sm mb-3">PIP Camera</h3>
+                <div class="space-y-3">
+                    <select id="pip-camera-select" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
+                        <option value="">-- Select a camera --</option>
+                    </select>
+                    <button id="toggle-pip-camera-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors">
                         Start PIP Camera
                     </button>
-                    <button id="toggle-pip-visibility-btn" class="w-full p-3 mb-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded transition-colors flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
+                    <button id="toggle-pip-visibility-btn" class="w-full p-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded transition-colors">
                         Hide PIP View
                     </button>
                 </div>
             </div>
-
+            
             <!-- Food Detection Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Food Detection</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <button id="food-detection-btn" class="w-full p-3 mb-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+            <div class="mb-6">
+                <h3 class="text-white font-bold text-sm mb-3">Food Detection</h3>
+                <div class="space-y-3">
+                    <button id="food-detection-btn" class="w-full p-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors">
                         Start Food Detection
                     </button>
-                    <button id="toggle-mask-btn" class="w-full p-3 mb-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            Show Masks
-        </button>
+                    <button id="toggle-mask-btn" class="w-full p-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors">
+                        Show Masks
+                    </button>
                     <div id="detection-status" class="text-center p-2 text-sm bg-gray-700 rounded">Food Detection: Off</div>
                 </div>
             </div>
-
-            <!-- Display Settings Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Display Settings</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div class="mb-4">
-                        <label class="flex items-center justify-between cursor-pointer">
-                            <span class="font-bold text-gray-300">Flip Animation</span>
-                            <div class="relative">
-                                <input type="checkbox" id="flip-animation-toggle" class="sr-only" checked>
-                                <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
-                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform translate-x-6"></div>
-                            </div>
-                        </label>
-                        <p class="text-xs text-gray-400 mt-2">Enable flip animation when status overlays are updated</p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block mb-2 font-bold text-gray-300">Animation Style:</label>
-                        <select id="animation-style-select" class="w-full p-2 rounded border border-gray-600 bg-gray-700 text-white">
-                            <option value="card-flip">Card Flip</option>
-                            <option value="y-flip">Y-Axis Flip</option>
-                            <option value="pulse">Pulse</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
+            
             <!-- Calorie Estimation Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Calorie Estimation</span>
-                    <span class="accordion-icon">+</span>
+            <div class="mb-6">
+                <h3 class="text-white font-bold text-sm mb-3">Calorie Estimation</h3>
+                <button id="calorie-estimation-btn" class="w-full p-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors">
+                    Start Calorie Estimation
                 </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div class="space-y-4">
-                        <button id="calorie-estimation-btn" class="w-full p-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            Start Calorie Estimation
-                        </button>
-                    </div>
-                </div>
             </div>
-
+            
             <!-- LLM Configuration Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>LLM Configuration</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div class="space-y-2">
-                        <div class="mb-4">
-                            <label for="video-file-input" class="block mb-2 font-bold text-gray-300">Select Local Video:</label>
-                            <input type="file" id="video-file-input" accept="video/*" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white">
-                            <div id="remembered-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
-                            <div id="video-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
-                            <button id="clear-remembered-file" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden">Clear Remembered File</button>
-                        </div>
-                        <div class="mb-4">
-                            <label for="image-file-input" class="block mb-2 font-bold text-gray-300">Select Local Image:</label>
-                            <input type="file" id="image-file-input" accept="image/*" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white">
-                            <div id="image-file-info" class="mt-2 text-xs text-gray-400 hidden"></div>
-                            <button id="clear-image-btn" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden">Clear Image</button>
-                        </div>
-                        <button id="configure-llm-btn" class="w-full p-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded transition-colors">Configure LLM</button>
-                        <button id="parse-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors" disabled>LLM Video Test</button>
-                        <div id="video-processing-progress" class="mt-3 hidden">
-                            <div class="w-full bg-gray-700 rounded">
-                                <div id="video-progress-bar" class="bg-green-500 h-5 rounded text-center leading-5 text-white" style="width: 0%">0%</div>
-                            </div>
-                            <div id="video-progress-text" class="mt-2 text-xs"></div>
-                        </div>
+            <div class="mb-6">
+                <h3 class="text-white font-bold text-sm mb-3">LLM Configuration</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block mb-2 text-sm" style="color: #B0B0B0;">Select Local Video:</label>
+                        <input type="file" id="video-file-input" accept="video/*" class="w-full p-2 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
                     </div>
+                    <div>
+                        <label class="block mb-2 text-sm" style="color: #B0B0B0;">Select Local Image:</label>
+                        <input type="file" id="image-file-input" accept="image/*" class="w-full p-2 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
+                    </div>
+                    <button id="configure-llm-btn" class="w-full p-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded transition-colors">
+                        Configure LLM
+                    </button>
+                    <button id="parse-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors">
+                        LLM Video Test
+                    </button>
                 </div>
             </div>
-
+            
             <!-- Video Recorder Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Video Recorder</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <div class="space-y-2">
-                        <button id="record-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            Start Recording
-                        </button>
-                        <button id="save-recorded-video-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                            </svg>
-                            Save Recording
-                        </button>
-                        <div id="recording-status" class="text-center p-2 text-sm bg-gray-700 rounded mt-3">Recording: Not Active</div>
-                    </div>
+            <div class="mb-6">
+                <h3 class="text-white font-bold text-sm mb-3">Video Recorder</h3>
+                <div class="space-y-3">
+                    <button id="record-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors">
+                        Start Recording
+                    </button>
+                    <button id="save-recorded-video-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors">
+                        Save Recording
+                    </button>
+                    <div id="recording-status" class="text-center p-2 text-sm bg-gray-700 rounded">Recording: Not Active</div>
                 </div>
             </div>
-
+            
             <!-- Audio Recorder Section -->
-            <div class="accordion-section mb-4 border border-gray-700 rounded overflow-hidden">
-                <button class="accordion-header w-full bg-gray-800 hover:bg-gray-750 text-left p-3 flex justify-between items-center text-xl font-bold text-gray-100">
-                    <span>Audio Recorder</span>
-                    <span class="accordion-icon">+</span>
-                </button>
-                <div class="accordion-content bg-gray-800 p-4 hidden">
-                    <!-- Audio Source Selection -->
-                    <div class="mb-4">
-                        <label for="audio-source-select" class="block mb-2 font-bold text-gray-300">Select Audio Source:</label>
-                        <select id="audio-source-select" class="w-full p-2 mb-3 rounded border border-gray-600 bg-gray-700 text-white" disabled>
+            <div class="mb-6">
+                <h3 class="text-white font-bold text-sm mb-3">Audio Recorder</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block mb-2 text-sm" style="color: #B0B0B0;">Select Audio Source:</label>
+                        <select id="audio-source-select" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
                             <option value="">-- Select an audio source --</option>
                         </select>
-                        <button id="refresh-audio-sources-btn" class="w-full p-2 mb-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded transition-colors flex items-center justify-center" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Refresh Audio Sources
-                        </button>
                     </div>
+                    <button id="record-audio-btn" class="w-full p-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors">
+                        Start Audio Recording
+                    </button>
+                    <button id="save-recorded-audio-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors">
+                        Save Audio Recording
+                    </button>
+                    <div id="audio-recording-status" class="text-center p-2 text-sm bg-gray-700 rounded">Audio Recording: Not Active</div>
                     
-                    <!-- Recording Controls -->
-                    <div class="space-y-2">
-                        <button id="record-audio-btn" class="w-full p-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                            </svg>
-                            Start Audio Recording
-                        </button>
-                        <button id="save-recorded-audio-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors flex items-center justify-center gap-2" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                            </svg>
-                            Save Audio Recording
-                        </button>
-                        <div id="audio-recording-status" class="text-center p-2 text-sm bg-gray-700 rounded mt-3">Audio Recording: Not Active</div>
+                    <!-- Audio Upload Log Container -->
+                    <div id="audio-upload-log-container" class="mt-4 p-3 bg-gray-900 rounded border border-gray-700 max-h-48 overflow-y-auto">
+                        <div class="text-sm font-bold text-gray-300 mb-2">Audio Upload Log:</div>
                     </div>
                 </div>
             </div>
-
-            <!-- LLM Configuration Panel (Hidden by default) -->
-            <div id="llm-config-panel" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold">Configure LLM Settings</h3>
-                        <button id="close-config-btn" class="text-gray-400 hover:text-white text-2xl leading-none">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+            
+            <!-- Mosaic Settings -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-2 text-sm" style="color: #B0B0B0;">Mosaic Blood Mode</label>
+                    <select id="mosaic-blend-mode" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
+                        <option value="source-over">Standard (fixed)</option>
+                        <option value="multiply">Multiply (Darker)</option>
+                        <option value="overlay">Overlay (Contrast)</option>
+                        <option value="soft-light">Soft Light (Gentle)</option>
+                        <option value="hard-light">Hard Light (Dramatic)</option>
+                        <option value="color-dodge">Color Dodge (Brighter)</option>
+                        <option value="color-burn">Color Burn (Darker)</option>
+                        <option value="screen">Screen (Lighter)</option>
+                        <option value="black-pixels">Black Pixels (Privacy)</option>
+                        <option value="simple-mask">Simple Mask (Cover)</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Mosaic Opacity</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="mosaic-opacity" min="0" max="100" value="27" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">27%</span>
                     </div>
-                    <div id="llm-config-content" class="space-y-4">
-                        <!-- Dynamic content will be inserted here -->
-                    </div>
-                    <div class="flex justify-end mt-6 space-x-2">
-                        <button id="save-llm-config-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                            </svg>
-                            Save Configuration
-                        </button>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm" style="color: #B0B0B0;">Cascas firefly Opacity</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="mosaic-canvas-opacity" min="0" max="100" value="50" class="custom-slider flex-grow" style="width: 120px;">
+                        <span class="text-white text-sm w-12 text-right">50%</span>
                     </div>
                 </div>
             </div>
         </div>
     </template>
 
-    <template id="camera-view-template">
-        <div class="h-full w-full flex flex-col p-5 bg-black transition-all duration-300" id="camera-view">
+    </template>
 
-            <!-- Detection Info -->
-            <div id="detection-info" class="absolute top-16 left-3 bg-black bg-opacity-70 text-white p-3 rounded text-sm z-20 hidden">
-                Food Items Detected: <span id="food-count">0</span>
-            </div>
-            
-            <!-- Main Camera Container -->
-            <div class="relative flex-grow min-h-0 mb-5" id="video-container">
-                <video id="main-video" class="w-full h-full object-contain bg-gray-800" autoplay muted playsinline></video>
+    <template id="camera-view-template">
+        <div class="h-full w-full flex flex-col bg-black" style="background-color: #000000;">
+            <!-- Main Video Container -->
+            <div class="relative flex-grow min-h-0" id="video-container">
+                <video id="main-video" class="w-full h-full object-contain bg-gray-800" autoplay muted playsinline style="object-fit: cover;"></video>
                 <img id="main-image" class="w-full h-full object-contain bg-gray-800 hidden" alt="Uploaded image">
                 <canvas id="detection-overlay" class="absolute top-0 left-0 pointer-events-none z-10"></canvas>
                 
-                <!-- Status Overlay - Now positioned inside video container -->
-                <div id="left-console" class="absolute top-3 left-3 p-3 text-sm z-20 w-64 space-y-4">
-                <div id="status-overlay" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
-                    <div id="main-status" class="mb-1">Main Camera: Not Active</div>
-                    <div id="pip-status" class="mb-1">PIP Camera: Not Active</div>
-                    <div id="camera-label">Camera: Not Selected</div>
-                    <div id="energy-status">Energy: 0</div>
-                    <div id="sleep-status">Sleep: 7.23 Hours</div>
-                    <div id="sport-status">Steps: 3450</div>
-                    <div id="blood-status">Blood Pressure: 85</div>
-                    <div id="heartRate-status">HeartRate: 82</div>
-                    <div id="calorie-status">Calories: 0</div>
-                    <div id="stream-connection-status" class="text-xs px-2 py-1 rounded bg-gray-600 text-white mt-2">Stream: Disconnected</div>
-                </div>
-                <div id="status-overlay2" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
-                    <div id="main-status2" class="mb-1">Main Camera: Not Active</div>
-                    <div id="pip-status2" class="mb-1">PIP Camera: Not Active</div>
-                    <div id="camera-label2">Camera: Not Selected</div>
-                    <div id="energy-status2">Energy: 0</div>
-                    <div id="heartRate-status2">HeartRate: 82</div>
-                </div>
-                    <div id="status-overlay3" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
-                        <div id="main-status3" class="mb-1">Main Camera: Not Active</div>
-                        <div id="pip-status3" class="mb-1">PIP Camera: Not Active</div>
-                        <div id="camera-label3">Camera: Not Selected</div>
-                        <div id="sleep-status3">Sleep: 7.23 Hours</div>
-                        <div id="sport-status3">Steps: 3450</div>
+                <!-- Health Data Overlay -->
+                <div class="absolute top-4 left-4 p-3 rounded-lg z-20" style="background-color: rgba(26, 26, 26, 0.8); padding: 12px; max-width: 300px;">
+                    <!-- 生理信息 Section -->
+                    <div class="mb-4">
+                        <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">生理信息</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/>
+                                </svg>
+                                <span>心率信息 10.36 次/分</span>
+                            </div>
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>血氧 98.2 %</span>
+                            </div>
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                                </svg>
+                                <span>速度 107 mph</span>
+                            </div>
+                        </div>
                     </div>
-                    <div id="status-overlay4" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
-                        <div id="main-status4" class="mb-1">Main Camera: Not Active</div>
-                        <div id="pip-status4" class="mb-1">PIP Camera: Not Active</div>
-                        <div id="camera-label4">Camera: Not Selected</div>
-                        <div id="blood-status4">Blood Pressure: 85</div>
-                        <div id="calorie-status4">Calories: 0</div>
+                    
+                    <!-- 语音信息 Section -->
+                    <div class="mb-4">
+                        <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">语音信息</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
+                                </svg>
+                                <span id="voice-info-1">语音信息 真儿</span>
+                            </div>
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
+                                </svg>
+                                <span id="voice-info-2">语音信息 聊聊天的音声</span>
+                            </div>
+                        </div>
                     </div>
-                    <div id="status-overlay5" class="status-overlay bg-black bg-opacity-50 text-green-500 p-3 rounded font-bold text-sm z-20 w-64">
-                        <div id="activity-status5">Activity: Monitoring</div>
-                        <div id="emotion-status5">Emotion: Neutral</div>
-                        <div id="time-status5">Time: --:--:--</div>
+                    
+                    <!-- 表情识别 Section -->
+                    <div class="mb-4">
+                        <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">表情识别</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>表情识别 微笑</span>
+                            </div>
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>表情识别 不酷</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 食物摄入识别 Section -->
+                    <div>
+                        <h3 class="font-bold text-sm mb-3" style="color: #00C853; font-size: 14px;">食物摄入识别</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>食物摄入识别 低</span>
+                            </div>
+                            <div class="flex items-center text-white text-sm">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>食物摄入识别 2</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
+                
                 <!-- PIP Overlay -->
                 <div id="pip-container" class="absolute bottom-5 right-5 z-30 w-48 h-36">
                     <div class="absolute top-0 right-0 z-40 bg-black bg-opacity-70 p-1 rounded">
@@ -642,42 +537,116 @@
                     <video id="pip-video" class="w-full h-full object-cover bg-gray-800 rounded border-2 border-white" autoplay muted playsinline></video>
                 </div>
             </div>
+        </div>
+    </template>
+
+    <template id="suggestion-panel-template">
+        <div class="h-full w-full p-4 overflow-y-auto" style="background-color: #1E1E1E;">
+            <!-- Title -->
+            <h2 class="text-white font-bold text-lg mb-4" style="margin-top: 16px;">今日摄入与建议</h2>
             
-<!--            &lt;!&ndash; Results Containers &ndash;&gt;-->
-<!--            <div id="detection-results" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>-->
-<!--            <div id="video-processing-results" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>-->
-<!--            -->
-<!--            &lt;!&ndash; Calorie Estimation Results &ndash;&gt;-->
-<!--            <div id="calorie-estimation-results" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>-->
-<!--            <div id="calorie-food-list" class="hidden mt-4 bg-gray-800 rounded p-4 max-h-48 overflow-y-auto"></div>-->
-<!--            -->
-<!--            &lt;!&ndash; Status Display &ndash;&gt;-->
-<!--            <div id="status-display" class="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-2 rounded text-sm z-20 hidden"></div>-->
-<!--            -->
-            <!-- Loading Indicator -->
-            <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30 hidden">
-                <div class="text-white text-lg">Processing...</div>
-            </div>
-            
-            <!-- Error Display -->
-            <div id="error-display" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30 hidden">
-                <div class="bg-red-600 text-white p-4 rounded max-w-md">
-                    <h3 class="font-bold mb-2">Error</h3>
-                    <p id="error-message" class="text-sm"></p>
-                    <button id="error-close-btn" class="mt-3 bg-white text-red-600 px-3 py-1 rounded text-sm">Close</button>
+            <!-- Food Icons Section -->
+            <div class="mb-6">
+                <div class="flex items-center justify-center space-x-3" style="spacing: 12px;">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 mb-2" fill="currentColor" viewBox="0 0 24 24" style="color: #FF6B35;">
+                            <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8-15.03-8-15.03 0h15.03zM1.02 17h15v2h-15z"/>
+                        </svg>
+                        <span class="text-white text-sm">汉堡包</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 mb-2" fill="currentColor" viewBox="0 0 24 24" style="color: #8B4513;">
+                            <path d="M2,21V19H20V21H2M20,8V5H18V8H20M20,3A2,2 0 0,1 22,5V8A2,2 0 0,1 20,10H18V13A4,4 0 0,1 14,17H8A4,4 0 0,1 4,13V10H2A2,2 0 0,1 0,8V5A2,2 0 0,1 2,3H20M16,5H4V8H16V5Z"/>
+                        </svg>
+                        <span class="text-white text-sm">咖啡</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 mb-2" fill="currentColor" viewBox="0 0 24 24" style="color: #FF0000;">
+                            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8Z"/>
+                        </svg>
+                        <span class="text-white text-sm">苹果</span>
+                    </div>
+                </div>
+                <!-- Connection lines between icons -->
+                <div class="flex justify-center mt-2">
+                    <div class="w-32 h-0.5 bg-gray-500"></div>
                 </div>
             </div>
             
-            <!-- Success Display -->
-            <div id="success-display" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30 hidden">
-                <div class="bg-green-600 text-white p-4 rounded max-w-md">
-                    <h3 class="font-bold mb-2">Success</h3>
-                    <p id="success-message" class="text-sm"></p>
-                    <button id="success-close-btn" class="mt-3 bg-white text-green-600 px-3 py-1 rounded text-sm">Close</button>
+            <!-- Health Suggestions Section -->
+            <div>
+                <h3 class="text-white font-bold text-sm mb-4" style="font-size: 14px;">健康建议</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start p-3 rounded" style="background-color: rgba(79, 195, 247, 0.1);">
+                        <svg class="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style="color: #4FC3F7;">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                        </svg>
+                        <p class="text-white text-sm leading-relaxed">建议：睡前听一些白噪音助眠。</p>
+                    </div>
+                    <div class="flex items-start p-3 rounded" style="background-color: rgba(79, 195, 247, 0.1);">
+                        <svg class="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style="color: #4FC3F7;">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                        </svg>
+                        <p class="text-white text-sm leading-relaxed">建议：保证充足的睡眠时间。</p>
+                    </div>
                 </div>
             </div>
         </div>
     </template>
+
+    <!-- LLM Configuration Panel (Hidden by default) -->
+    <div id="llm-config-panel" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Configure LLM Settings</h3>
+                <button id="close-config-btn" class="text-gray-400 hover:text-white text-2xl leading-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="llm-config-content" class="space-y-4">
+                <!-- Dynamic content will be inserted here -->
+            </div>
+            <div class="flex justify-end mt-6 space-x-2">
+                <button id="save-llm-config-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Container -->
+    <div id="progress-container" class="hidden mb-4"></div>
+    
+    <!-- Video Progress Container -->
+    <div id="video-progress-container" class="hidden mb-4">
+        <div id="video-processing-progress" class="mt-3">
+            <div class="w-full bg-gray-700 rounded">
+                <div id="video-progress-bar" class="bg-green-500 h-5 rounded text-center leading-5 text-white" style="width: 0%">0%</div>
+            </div>
+            <div id="video-progress-text" class="mt-2 text-xs text-white"></div>
+        </div>
+    </div>
+
+    <div id="error-container" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+        <div class="bg-red-600 text-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 class="font-bold mb-2">Error</h3>
+            <p id="error-message" class="text-sm mb-4"></p>
+            <button id="error-close-btn" class="bg-white text-red-600 px-4 py-2 rounded">Close</button>
+        </div>
+    </div>
+
+    <div id="success-container" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+        <div class="bg-green-600 text-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 class="font-bold mb-2">Success</h3>
+            <p id="success-message" class="text-sm mb-4"></p>
+            <button id="success-close-btn" class="bg-white text-green-600 px-4 py-2 rounded">Close</button>
+        </div>
+    </div>
 
     <!-- UI Overlay Elements -->
     <div id="loading-overlay" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
@@ -686,6 +655,14 @@
                 <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-white mr-3"></div>
                 <span class="text-white">Loading...</span>
             </div>
+        </div>
+    </div>
+    
+    <!-- Status Overlay for StreamController -->
+    <div id="status-overlay" class="fixed top-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg max-w-sm z-50 hidden">
+        <div class="flex items-center">
+            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+            <span id="status-message">Processing...</span>
         </div>
     </div>
 
