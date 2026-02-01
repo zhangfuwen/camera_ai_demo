@@ -295,7 +295,7 @@
             </button>
             
             <!-- PIP Camera Section -->
-            <div class="mb-6">
+            <div class="mb-6 hidden">
                 <h3 class="text-white font-bold text-sm mb-3">PIP Camera</h3>
                 <div class="space-y-3">
                     <select id="pip-camera-select" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">
@@ -325,7 +325,7 @@
             </div>
             
             <!-- Calorie Estimation Section -->
-            <div class="mb-6">
+            <div class="mb-6 hidden">
                 <h3 class="text-white font-bold text-sm mb-3">Calorie Estimation</h3>
                 <button id="calorie-estimation-btn" class="w-full p-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded transition-colors">
                     Start Calorie Estimation
@@ -333,7 +333,7 @@
             </div>
             
             <!-- LLM Configuration Section -->
-            <div class="mb-6">
+            <div class="mb-6 hidden">
                 <h3 class="text-white font-bold text-sm mb-3">LLM Configuration</h3>
                 <div class="space-y-3">
                     <div>
@@ -360,13 +360,13 @@
                     <button id="record-video-btn" class="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition-colors">
                         Start Recording
                     </button>
-                    <div id="recording-status" class="text-center p-2 text-sm bg-gray-700 rounded">Recording: Not Active</div>
+                    <div id="recording-status" class="text-center p-2 text-sm bg-gray-700 rounded hidden">Recording: Not Active</div>
                 </div>
             </div>
             
             <!-- Audio Recorder Section -->
             <div class="mb-6">
-                <h3 class="text-white font-bold text-sm mb-3">Audio Recorder</h3>
+                <h3 class="text-white font-bold text-sm mb-3 hidden">Audio Recorder</h3>
                 <div class="space-y-3">
                     <div>
                         <label class="block mb-2 text-sm" style="color: #B0B0B0;">Select Audio Source:</label>
@@ -377,20 +377,20 @@
                     <button id="record-audio-btn" class="w-full p-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors">
                         Start Audio Recording
                     </button>
-                    <button id="save-recorded-audio-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors">
+                    <button id="save-recorded-audio-btn" class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors hidden">
                         Save Audio Recording
                     </button>
-                    <div id="audio-recording-status" class="text-center p-2 text-sm bg-gray-700 rounded">Audio Recording: Not Active</div>
+                    <div id="audio-recording-status" class="text-center p-2 text-sm bg-gray-700 rounded hidden">Audio Recording: Not Active</div>
                     
                     <!-- Audio Upload Log Container -->
-                    <div id="audio-upload-log-container" class="mt-4 p-3 bg-gray-900 rounded border border-gray-700 max-h-48 overflow-y-auto">
+                    <div id="audio-upload-log-container" class="mt-4 p-3 bg-gray-900 rounded border border-gray-700 max-h-48 overflow-y-auto hidden">
                         <div class="text-sm font-bold text-gray-300 mb-2">Audio Upload Log:</div>
                     </div>
                 </div>
             </div>
             
             <!-- Mosaic Settings -->
-            <div class="space-y-4">
+            <div class="space-y-4 hidden">
                 <div>
                     <label class="block mb-2 text-sm" style="color: #B0B0B0;">Mosaic Blood Mode</label>
                     <select id="mosaic-blend-mode" class="w-full p-3 rounded text-white" style="background-color: #1E1E1E; border: 1px solid #444;">

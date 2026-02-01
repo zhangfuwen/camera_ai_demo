@@ -409,7 +409,13 @@ export class FoodDetectionController {
             if (label == 'person') {
                 return;
             }
-            
+            if (label == 'laptop' || label == 'mouse' || label == 'keyboard' || label == 'cell phone'
+                || label == 'dining table' || label == 'chair'
+                || label == 'remote' || label == 'toilet'
+            ) {
+                return;
+            }
+
             // Use the original box coordinates (they're already in source resolution space)
             const x1 = box.xmin;
             const y1 = box.ymin;

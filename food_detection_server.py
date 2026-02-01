@@ -247,7 +247,7 @@ def detect_food():
         log_debug("Image shape:" + str(img.shape))
         
         # Perform segmentation with YOLO
-        results = model(img, conf=0.1)  # Confidence threshold of 0.5
+        results = model(img, conf=0.5)  # Confidence threshold of 0.5
         
         detections = []
         
@@ -1035,7 +1035,8 @@ async def analyze_video_with_gemini(video_path):
     "diet_status": "饮食状况与健康状况",
     "overall_mental_state": "整体心理状态",
     "attention_level": "注意力集中程度（高/中/低）",
-    "emotion_cause": "可能的情绪原因"
+    "emotion_cause": "可能的情绪原因",
+    "eating_drinking": "是否在进食或饮用饮料（是/否）, 如果是，请描述具体的食物或饮料及能量和是否健康"
 }
 
 请确保返回的是有效的JSON格式，不要包含任何其他文本或说明。"""
@@ -1064,6 +1065,7 @@ async def analyze_video_with_gemini(video_path):
         
         analysis_text = response.choices[0].message.content
         log_info(f'[GEMINI] Video analysis completed successfully')
+        eating_drinking = '未检测到'
         
         # Parse JSON response
         try:
@@ -1102,6 +1104,7 @@ async def analyze_video_with_gemini(video_path):
             emotion_intensity = video_analysis.get('emotion_intensity', '未知')
             activity_level = video_analysis.get('activity_level', '未知')
             overall_state = video_analysis.get('overall_mental_state', '正常')
+            eating_drinking = video_analysis.get('eating_drinking', '未检测到')
             
             log_info(f'[GEMINI] Successfully parsed video analysis JSON: {emotion_state}, {activity_level}')
             
@@ -1118,25 +1121,25 @@ async def analyze_video_with_gemini(video_path):
         # Generate comprehensive video detection HTML using loop format
         video_items = [
             {
-                'label': '活动强度',
-                'value': activity_level,
-                'icon': 'M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z'
-            },
-            {
-                'label': '心理状态',
-                'value': overall_state,
-                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
-            },
-            {
-                'label': '情绪强度',
-                'value': emotion_intensity,
-                'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
-            },
-            {
-                'label': '分析时间',
-                'value': datetime.now().strftime('%H:%M:%S'),
+                'label': '进食情况',
+                'value': eating_drinking,
                 'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
-            }
+            },
+            # {
+            #     'label': '心理状态',
+            #     'value': overall_state,
+            #     'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            # },
+            # {
+            #     'label': '情绪强度',
+            #     'value': emotion_intensity,
+            #     'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z'
+            # },
+            # {
+            #     'label': '分析时间',
+            #     'value': datetime.now().strftime('%H:%M:%S'),
+            #     'icon': 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+            # }
         ]
         
         # Generate HTML using loop
