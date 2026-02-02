@@ -15,9 +15,9 @@ python food_detection_server.py
 Under Linux/Mac OS:
 
 ```python
-python -m venv .venv
+python3 -m venv .venv
 source ./.venv/bin/activate
 pip install -r requirements.txt
-python food_detection_server.py
+python3 food_detection_server.py
 
 ```
