@@ -29,6 +29,8 @@ export class AudioRecorderController {
         this.setupEventListeners();
         this.updateUI();
         this.getAudioDevices();
+        // Proactively request microphone permission so device labels and recording work properly
+        this.initializeMicrophonePermission();
     }
 
     /**
@@ -42,6 +44,11 @@ export class AudioRecorderController {
 
         document.addEventListener('saveRecordedAudio', () => {
             this.saveRecordedAudio();
+        });
+
+        // Allow manual microphone permission request via custom event
+        document.addEventListener('requestMicrophonePermission', () => {
+            this.initializeMicrophonePermission();
         });
 
         // Audio source selection
@@ -59,6 +66,29 @@ export class AudioRecorderController {
             refreshBtn.addEventListener('click', () => {
                 this.getAudioDevices();
             });
+        }
+    }
+
+    /**
+     * Request microphone permission
+     */
+    async initializeMicrophonePermission() {
+        try {
+            this.logger.debug('Requesting microphone permission...');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Stop the stream immediately after getting permission
+            stream.getTracks().forEach(track => track.stop());
+
+            this.logger.info('Microphone permission granted');
+            this.updateStatus('Microphone permission granted');
+            // Refresh audio device list to populate labels after permission
+            await this.getAudioDevices();
+            return true;
+        } catch (error) {
+            this.logger.error(`Error requesting microphone permission: ${error.message}`);
+            this.updateStatus('Error: Microphone permission denied');
+            this.addUploadLog('Error requesting microphone permission: ' + error.message, 'error');
+            return false;
         }
     }
 

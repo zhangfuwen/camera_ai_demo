@@ -17,6 +17,8 @@ export class FoodDetectionController {
         this.lastDetectionResults = [];
         this.ctx = null;
         this.showMasks = false;  // Track mask visibility state (default to showing only boxes)
+        // Track current detection fetch to allow aborting when stopping
+        this.currentFetchController = null;
     }
 
     /**
@@ -85,13 +87,14 @@ export class FoodDetectionController {
                          !document.getElementById('main-image').classList.contains('hidden');
         
         if (!hasVideoStream && !hasImage) {
-            updateStatus('detection-status', 'No video or image source available', 'error');
+            updateStatus('detection-status', 'No video or image source available');
             return;
         }
 
         this.isDetecting = true;
         updateButton(this.detectionButton, 'Stop Food Detection', false);
-        updateStatus('detection-status', 'Food Detection: Active', 'success');
+        showElement(this.detectionStatus);
+        updateStatus('detection-status', 'Food Detection: Active');
 
         // For images, perform detection only once
         if (hasImage) {
@@ -113,7 +116,14 @@ export class FoodDetectionController {
      * Stop food detection
      */
     stopFoodDetection() {
+        // Mark as stopped first to prevent new work
         this.isDetecting = false;
+        
+        // Abort any in-flight detection request
+        if (this.currentFetchController) {
+            try { this.currentFetchController.abort(); } catch (_) {}
+            this.currentFetchController = null;
+        }
         
         if (this.detectionInterval) {
             clearInterval(this.detectionInterval);
@@ -121,7 +131,7 @@ export class FoodDetectionController {
         }
 
         updateButton(this.detectionButton, 'Start Food Detection', false);
-        updateStatus('detection-status', 'Food Detection: Off', 'info');
+        updateStatus('detection-status', 'Food Detection: Off');
         
         // Clear detection overlay
         this.clearDetectionOverlay();
@@ -154,6 +164,11 @@ export class FoodDetectionController {
      * Perform food detection by capturing current frame and sending to API
      */
     async performDetection() {
+        // Do nothing if detection has been stopped
+        if (!this.isDetecting) {
+            return;
+        }
+        
         // Check if we have either a video stream or an image
         const hasVideoStream = this.mainVideo && this.mainVideo.srcObject;
         const hasImage = document.getElementById('main-image') && 
@@ -187,7 +202,7 @@ export class FoodDetectionController {
 
             // Apply the same transforms that are applied to the video element
             // Get the camera controller to access transform settings
-            const cameraController = window.cameraController;
+            const cameraController = window.app?.cameraController;
             if (cameraController && cameraController.videoElement === sourceElement) {
                 // Save the current context state
                 tempCtx.save();
@@ -228,7 +243,10 @@ export class FoodDetectionController {
             const imageData = tempCanvas.toDataURL('image/jpeg');
             const base64Image = imageData.split(',')[1];
             
-            // Send to backend API
+            // Prepare for backend API call
+            const controller = new AbortController();
+            this.currentFetchController = controller;
+            
             const response = await fetch('/detect_food', {
                 method: 'POST',
                 headers: {
@@ -236,8 +254,11 @@ export class FoodDetectionController {
                 },
                 body: JSON.stringify({
                     image: base64Image
-                })
+                }),
+                signal: controller.signal
             });
+
+            this.currentFetchController = null;
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -245,18 +266,27 @@ export class FoodDetectionController {
 
             const result = await response.json();
             
+            // If stopped while awaiting response, do not update UI
+            if (!this.isDetecting) {
+                return;
+            }
+            
             // Check if result has the expected structure
             if (result.success && result.detections) {
                 this.lastDetectionResults = result.detections;
                 this.drawDetections(this.lastDetectionResults);
                 this.displayDetections(result); // Display results in the UI
-                updateStatus('detection-status', `Detected ${this.lastDetectionResults.length} food items`, 'success');
+                updateStatus('detection-status', `Detected ${this.lastDetectionResults.length} food items`);
             } else {
                 throw new Error(result.error || 'Detection failed');
             }
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                // Request was aborted due to stopping detection; ignore
+                return;
+            }
             console.error('Error during food detection:', error);
-            updateStatus('detection-status', `Detection error: ${error.message}`, 'error');
+            updateStatus('detection-status', `Detection error: ${error.message}`);
         }
     }
 
@@ -265,6 +295,11 @@ export class FoodDetectionController {
      */
     drawDetections(detections) {
         if (!this.ctx || !this.detectionOverlay) {
+            return;
+        }
+        
+        // If stopped while drawing, skip
+        if (!this.isDetecting) {
             return;
         }
 
@@ -296,7 +331,7 @@ export class FoodDetectionController {
         const videoRect = sourceElement.getBoundingClientRect();
         
         // Get camera controller to check for rotation
-        const cameraController = window.cameraController;
+        const cameraController = window.app?.cameraController;
         let effectiveSourceWidth = sourceWidth;
         let effectiveSourceHeight = sourceHeight;
         
@@ -311,7 +346,7 @@ export class FoodDetectionController {
                 });
             }
         }
-        
+
         // Calculate the actual video content area within the main-video element
         // The video element has object-contain, so the actual video content might be smaller than the element
         const videoAspect = effectiveSourceWidth / effectiveSourceHeight;

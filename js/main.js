@@ -176,6 +176,8 @@ function setupEventDelegation() {
         if (target.matches('#request-permission-btn')) {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('requestPermission'));
+            // Also request microphone permission for audio features
+            document.dispatchEvent(new CustomEvent('requestMicrophonePermission'));
         }
         
         // Main camera control - toggle button
@@ -191,7 +193,7 @@ function setupEventDelegation() {
         }
         
         // Food detection controls
-        if (target.matches('#food-detection-btn')) {
+        if (target.closest('#food-detection-btn')) {
             event.preventDefault();
             document.dispatchEvent(new CustomEvent('toggleFoodDetection'));
         }
